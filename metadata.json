@@ -1,0 +1,6 @@
+{
+  "name": "MoDOT Traffic Volume Archive Workstation",
+  "description": "Desktop-grade workstation to view, analyze, and archive Missouri DOT traffic volume maps, AADT datasets, and count station data.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

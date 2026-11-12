@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a" />
+      <stop offset="100%" stop-color="#020617" />
+    </linearGradient>
+    <linearGradient id="highwayGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#10b981" />
+      <stop offset="100%" stop-color="#059669" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Outer Rounded Shield -->
+  <rect width="512" height="512" rx="104" fill="url(#bgGrad)" />
+  <rect x="24" y="24" width="464" height="464" rx="80" fill="none" stroke="#334155" stroke-width="8" stroke-opacity="0.6" />
+  
+  <!-- Central Highway Shield Badge -->
+  <path d="M 256,70 C 350,70 410,105 410,180 C 410,310 256,435 256,435 C 256,435 102,310 102,180 C 102,105 162,70 256,70 Z" fill="url(#highwayGrad)" stroke="#ffffff" stroke-width="12" />
+  
+  <!-- Interstate Highway Lines -->
+  <path d="M 180,340 L 230,190 L 282,190 L 332,340" fill="none" stroke="#ffffff" stroke-width="24" stroke-linecap="round" stroke-linejoin="round" />
+  <path d="M 200,285 L 312,285" fill="none" stroke="#ffffff" stroke-width="20" stroke-linecap="round" />
+  
+  <!-- Crown Header Text -->
+  <text x="256" y="145" fill="#ffffff" font-family="system-ui, -apple-system, sans-serif" font-size="44" font-weight="900" text-anchor="middle" letter-spacing="4">DOT</text>
+</svg>
