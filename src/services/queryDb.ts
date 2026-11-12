@@ -22,7 +22,11 @@ function manifest(): Promise<Manifest | null> {
 async function getDb() {
   dbP ??= (async () => {
     const duckdb = await import('@duckdb/duckdb-wasm'); // lazy: keeps ~200 kB out of the main chunk
-    const bundle = await duckdb.selectBundle(duckdb.getJsDelivrBundles());
+    // Android app: DuckDB ships inside the app (works offline). The WebView is Chromium, so the exception-handling build is always supported.
+    const local = (import.meta as any).env?.VITE_ANDROID
+      ? (() => { const b = { mainModule: new URL('/duckdb/duckdb-eh.wasm', location.href).href, mainWorker: new URL('/duckdb/duckdb-browser-eh.worker.js', location.href).href }; return { mvp: b, eh: b }; })()
+      : null;
+    const bundle = await duckdb.selectBundle(local ?? duckdb.getJsDelivrBundles());
     const workerUrl = URL.createObjectURL(new Blob([`importScripts("${bundle.mainWorker!}");`], { type: 'text/javascript' }));
     const db = new duckdb.AsyncDuckDB(new duckdb.VoidLogger(), new Worker(workerUrl));
     await db.instantiate(bundle.mainModule, bundle.pthreadWorker);
@@ -119,7 +123,7 @@ export const queryDb = {
   },
 
   /** Segments for one state. `bbox` filters by viewport using the min/max columns; `lowRes` uses the simplified geometry. */
-  async segments(state: string, opts: { bbox?: [number, number, number, number]; lowRes?: boolean; classes?: string[]; limit?: number; includeUncounted?: boolean } = {}): Promise<TrafficSegment[]> {
+  async segments(state: string, opts: { bbox?: [number, number, number, number]; lowRes?: boolean; classes?: string[]; limit?: number; includeUncounted?: boolean; recentOnly?: boolean } = {}): Promise<TrafficSegment[]> {
     const src = await view(state, 'seg');
     if (!src) return [];
     const conds: string[] = [];
@@ -127,6 +131,8 @@ export const queryDb = {
     if (opts.classes?.length) conds.push(`fclass IN (${opts.classes.map(c => `'${c.replace(/'/g, "''")}'`).join(',')})`);
     // every segment's geometry is stored; by default only those with a count in some year are returned
     if (!opts.includeUncounted) conds.push('has_count = 1');
+    // current network only: segments whose newest count is from the state's latest two data years (older-era segments overlap it)
+    if (opts.recentOnly) { const latest = (await manifest())?.files.find(f => f.state === state && f.kind === 'seg')?.latest; if (latest) conds.push(`aadt_year >= ${latest - 1}`); }
     const where = conds.length ? 'WHERE ' + conds.join(' AND ') : '';
     // with a limit, keep the busiest segments (the ones that matter most when zoomed out)
     const order = opts.limit ? 'ORDER BY aadt_cur DESC NULLS LAST' : 'ORDER BY route, mp_start';

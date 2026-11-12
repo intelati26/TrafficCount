@@ -20,7 +20,7 @@ import {
 import { TrafficSegment, ContinuousCountStation, StateConfig } from '../types/traffic';
 import { DETAILED_STATE_BOUNDARIES, MAJOR_WATERWAYS } from '../data/geographicBoundaries';
 
-export interface MapViewport { bbox: [number, number, number, number]; zoom: number } // [minLng, minLat, maxLng, maxLat]
+export interface MapViewport { bbox: [number, number, number, number]; zoom: number; historical?: boolean } // [minLng, minLat, maxLng, maxLat]
 
 interface GisMapViewerProps {
   /** Called (debounced) when pan/zoom changes, so the host can load only the visible segments. */
@@ -67,6 +67,8 @@ export const GisMapViewer: React.FC<GisMapViewerProps> = ({
   const [showNeighbors, setShowNeighbors] = useState<boolean>(true);
   const [showCities, setShowCities] = useState<boolean>(true);
   const [showShields, setShowShields] = useState<boolean>(true);
+  // by default the map draws the current network; older-era segments overlap it, so they are an opt-in layer
+  const [showHistorical, setShowHistorical] = useState<boolean>(false);
   const [multiSelectMode, setMultiSelectMode] = useState<boolean>(false);
   const [isLegendExpanded, setIsLegendExpanded] = useState<boolean>(true);
   const [isLayerMenuOpen, setIsLayerMenuOpen] = useState<boolean>(false);
@@ -126,11 +128,11 @@ export const GisMapViewer: React.FC<GisMapViewerProps> = ({
       const padX = Math.abs(b[0] - a[0]) * 0.1, padY = Math.abs(a[1] - b[1]) * 0.1; // small margin so edges don't pop in
       onViewportChange({
         bbox: [Math.min(a[0], b[0]) - padX, Math.min(a[1], b[1]) - padY, Math.max(a[0], b[0]) + padX, Math.max(a[1], b[1]) + padY],
-        zoom
+        zoom, historical: showHistorical
       });
     }, 250);
     return () => clearTimeout(t);
-  }, [zoom, pan.x, pan.y, stateConfig.code, onViewportChange]);
+  }, [zoom, pan.x, pan.y, stateConfig.code, onViewportChange, showHistorical]);
 
   // Filter segments for active state
   const stateSegments = useMemo(() => {
@@ -494,6 +496,15 @@ export const GisMapViewer: React.FC<GisMapViewerProps> = ({
                     type="checkbox"
                     checked={showShields}
                     onChange={(e) => setShowShields(e.target.checked)}
+                    className="rounded bg-slate-800 border-slate-700 text-sky-500 focus:ring-0"
+                  />
+                </label>
+                <label className="flex items-center justify-between px-2 py-1 rounded hover:bg-slate-800 cursor-pointer" title="Also draw segments whose newest count is from an earlier year (older road segmentation; overlaps the current network)">
+                  <span className="text-slate-300">Counted only in earlier years</span>
+                  <input
+                    type="checkbox"
+                    checked={showHistorical}
+                    onChange={(e) => setShowHistorical(e.target.checked)}
                     className="rounded bg-slate-800 border-slate-700 text-sky-500 focus:ring-0"
                   />
                 </label>

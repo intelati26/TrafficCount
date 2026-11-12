@@ -1,0 +1,75 @@
+name: Android APK
+
+# Builds a debug APK of the app on GitHub. NO DATA is built in: the repository holds no traffic data, so this APK is the app only
+# (the offline DuckDB engine is included). The job fails if any Parquet file ends up inside the APK.
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+  pull_request:
+    paths:
+      - 'android/**'
+      - 'capacitor.config.ts'
+      - 'vite.config.ts'
+      - 'src/**'
+      - '.github/workflows/android.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  apk:
+    name: Build debug APK (no data)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'      # Android's Gradle needs 17-21; Capacitor's wrapper uses Gradle 8.14
+
+      - name: Install web dependencies
+        run: deno install
+
+      - name: Build the web app for Android (no states bundled)
+        env:
+          VITE_ANDROID: '1'
+          ANDROID_STATES: ''
+        run: deno run -A npm:vite build --mode android
+
+      - name: Sync into the Android project
+        run: deno run -A npm:@capacitor/cli sync android
+
+      - name: Build the APK
+        working-directory: android
+        run: ./gradlew --no-daemon assembleDebug
+
+      - name: Guard - no data inside the APK
+        run: |
+          APK=android/app/build/outputs/apk/debug/app-debug.apk
+          ls -l "$APK"
+          if unzip -l "$APK" | grep -Ei '\.parquet|\.ndjson'; then
+            echo "Data files found inside the APK. Built data must never go to GitHub."; exit 1
+          fi
+          # second guard: the app alone is ~40 MB; anything far larger means data got in
+          SIZE=$(stat -c %s "$APK")
+          if [ "$SIZE" -gt 83886080 ]; then echo "APK is $SIZE bytes (>80 MB): unexpected content."; exit 1; fi
+          echo "ok: no data files in the APK ($SIZE bytes)"
+
+      - name: Upload the APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: traffic-archive-debug-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14

@@ -94,7 +94,7 @@ export default function App() {
       : v.zoom < 2.5 ? ['Interstate', 'Freeway & Expressway', 'Other Principal Arterial']
       : v.zoom < 3.5 ? ['Interstate', 'Freeway & Expressway', 'Other Principal Arterial', 'Minor Arterial', 'Major Collector'] : undefined;
     try {
-      const segs = await queryDb.segments(activeStateCode, { bbox: v.bbox, classes, lowRes: v.zoom < 2.5, limit: v.zoom >= 3.5 ? 30000 : 8000 });
+      const segs = await queryDb.segments(activeStateCode, { bbox: v.bbox, classes, lowRes: v.zoom < 2.5, limit: v.zoom >= 3.5 ? 30000 : 8000, recentOnly: !v.historical });
       if (id === viewportReq.current) setMapSegments(segs);
     } catch (e) { console.warn('Viewport query failed:', e); }
   }, [activeStateCode]);
@@ -107,7 +107,7 @@ export default function App() {
       if (!(await queryDb.available())) return;
       const [segs, stas, docs] = await Promise.all([
         // grid/analysis set: busiest segments with simplified geometry; the map loads full detail by viewport below
-        queryDb.segments(activeStateCode, { lowRes: true, limit: 20000 }), queryDb.stations(activeStateCode), queryDb.documents(activeStateCode)
+        queryDb.segments(activeStateCode, { lowRes: true, limit: 20000, recentOnly: true }), queryDb.stations(activeStateCode), queryDb.documents(activeStateCode)
       ]);
       if (cancelled) return;
       const swap = <T extends { stateCode?: string }>(prev: T[], next: T[]) =>
