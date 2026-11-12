@@ -1,3 +1,5 @@
+import { queryDb } from './services/queryDb';
+import type { MapViewport } from './components/GisMapViewer';
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Header, ActiveView } from './components/Header';
 import { GisMapViewer } from './components/GisMapViewer';
@@ -6,6 +8,7 @@ import { DataGridTable } from './components/DataGridTable';
 import { ContinuousCountStationView } from './components/ContinuousCountStationView';
 import { TrendAnalyzer } from './components/TrendAnalyzer';
 import { DatabaseManager } from './components/DatabaseManager';
+import { DataPacks } from './components/DataPacks';
 import { SegmentInspectorModal } from './components/SegmentInspectorModal';
 import { BatchArchiverModal } from './components/BatchArchiverModal';
 import { InstallPlatformModal } from './components/InstallPlatformModal';
@@ -80,6 +83,42 @@ export default function App() {
     refreshData();
   }, [refreshData]);
 
+  // Viewport-driven map segments (null = not using Parquet, map shows the bundled/IndexedDB set)
+  const [mapSegments, setMapSegments] = useState<TrafficSegment[] | null>(null);
+  const viewportReq = React.useRef(0);
+  const handleViewportChange = useCallback(async (v: MapViewport) => {
+    if (!(await queryDb.has(activeStateCode, 'seg'))) return;
+    const id = ++viewportReq.current;
+    // zoomed out: only the main network at low-res; zoom in for lesser roads at full detail
+    const classes = v.zoom < 1.3 ? ['Interstate', 'Freeway & Expressway']
+      : v.zoom < 2.5 ? ['Interstate', 'Freeway & Expressway', 'Other Principal Arterial']
+      : v.zoom < 3.5 ? ['Interstate', 'Freeway & Expressway', 'Other Principal Arterial', 'Minor Arterial', 'Major Collector'] : undefined;
+    try {
+      const segs = await queryDb.segments(activeStateCode, { bbox: v.bbox, classes, lowRes: v.zoom < 2.5, limit: v.zoom >= 3.5 ? 30000 : 8000 });
+      if (id === viewportReq.current) setMapSegments(segs);
+    } catch (e) { console.warn('Viewport query failed:', e); }
+  }, [activeStateCode]);
+  useEffect(() => { setMapSegments(null); viewportReq.current++; }, [activeStateCode]);
+
+  // Overlay user-built Parquet data (public/data/q) for the active state, if present; otherwise keep bundled samples.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!(await queryDb.available())) return;
+      const [segs, stas, docs] = await Promise.all([
+        // grid/analysis set: busiest segments with simplified geometry; the map loads full detail by viewport below
+        queryDb.segments(activeStateCode, { lowRes: true, limit: 20000 }), queryDb.stations(activeStateCode), queryDb.documents(activeStateCode)
+      ]);
+      if (cancelled) return;
+      const swap = <T extends { stateCode?: string }>(prev: T[], next: T[]) =>
+        next.length ? [...prev.filter((x) => x.stateCode !== activeStateCode), ...next] : prev;
+      setSegments((p) => swap(p, segs));
+      setStations((p) => swap(p, stas));
+      setDocuments((p) => swap(p, docs));
+    })().catch((e) => console.warn('Parquet data unavailable, using bundled samples:', e));
+    return () => { cancelled = true; };
+  }, [activeStateCode]);
+
   // Handle segment selection (supports single-select or multi-segment corridor chaining)
   const handleSelectSegment = (segment: TrafficSegment, isMultiSelect: boolean = false) => {
     setSelectedStation(null);
@@ -142,7 +181,8 @@ export default function App() {
         {activeView === 'map' && (
           <GisMapViewer
             stateConfig={activeStateConfig}
-            segments={segments}
+            segments={mapSegments ?? segments}
+            onViewportChange={handleViewportChange}
             stations={stations}
             selectedSegments={selectedSegments}
             selectedStation={selectedStation}
@@ -189,6 +229,8 @@ export default function App() {
         {activeView === 'trends' && (
           <TrendAnalyzer />
         )}
+
+        {activeView === 'data_packs' && <DataPacks />}
 
         {activeView === 'db_manager' && (
           <DatabaseManager

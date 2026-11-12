@@ -1,0 +1,302 @@
+[
+ {
+  "c": "AL",
+  "u": "https://www.dot.state.al.us/maintenance/Traffic/",
+  "status": 200,
+  "final": "https://www.dot.state.al.us/errors/notfound.html"
+ },
+ {
+  "c": "AK",
+  "u": "https://dot.alaska.gov/stwdplng/transdata/traffic_AADT_map.shtml",
+  "status": 404,
+  "final": "https://dot.alaska.gov/stwdplng/transdata/traffic_AADT_map.shtml"
+ },
+ {
+  "c": "AZ",
+  "u": "https://azdot.gov/planning/transportation-analysis/traffic-counts",
+  "status": 404,
+  "final": "https://azdot.gov/planning/transportation-analysis/traffic-counts"
+ },
+ {
+  "c": "AR",
+  "u": "https://www.ardot.gov/divisions/planning/",
+  "status": 200,
+  "final": "https://ardot.gov/divisions/planning/"
+ },
+ {
+  "c": "CA",
+  "u": "https://dot.ca.gov/programs/traffic-operations/census",
+  "status": 200,
+  "final": "https://dot.ca.gov/programs/traffic-operations/census"
+ },
+ {
+  "c": "CO",
+  "u": "https://www.codot.gov/programs/planning/inventory-and-travel-data/traffic-data",
+  "status": 404,
+  "final": "https://www.codot.gov/programs/planning/inventory-and-travel-data/traffic-data"
+ },
+ {
+  "c": "CT",
+  "u": "https://portal.ct.gov/dot",
+  "status": 200,
+  "final": "https://portal.ct.gov/dot"
+ },
+ {
+  "c": "DE",
+  "u": "https://deldot.gov/Publications/reports/traffic_counts/",
+  "status": 404,
+  "final": "https://deldot.gov/Publications/reports/traffic_counts/"
+ },
+ {
+  "c": "FL",
+  "u": "https://tdaappsprod.dot.state.fl.us/fto/",
+  "status": 200,
+  "final": "https://tdaappsprod.dot.state.fl.us/fto/"
+ },
+ {
+  "c": "GA",
+  "u": "https://gdottrafficdata.drakewell.com/",
+  "status": 200,
+  "final": "https://gdottrafficdata.drakewell.com/publicmultinodemap.asp"
+ },
+ {
+  "c": "HI",
+  "u": "https://hidot.hawaii.gov/highways/",
+  "status": 200,
+  "final": "https://hidot.hawaii.gov/highways/"
+ },
+ {
+  "c": "ID",
+  "u": "https://apps.itd.idaho.gov/apps/Traffic/",
+  "status": 200,
+  "final": "https://itd.idaho.gov/"
+ },
+ {
+  "c": "IL",
+  "u": "https://gis-idot.opendata.arcgis.com/",
+  "status": 200,
+  "final": "https://gis-idot.opendata.arcgis.com/"
+ },
+ {
+  "c": "IN",
+  "u": "https://www.in.gov/indot/",
+  "status": 200,
+  "final": "https://www.in.gov/indot/"
+ },
+ {
+  "c": "IA",
+  "u": "https://iowadot.gov/maps/Data/Traffic-data",
+  "status": 404,
+  "final": "https://iowadot.gov/maps/Data/Traffic-data"
+ },
+ {
+  "c": "KS",
+  "u": "https://www.ksdot.gov/bureaus/burtransplan/maps/Traffic.asp",
+  "status": 404,
+  "final": "https://www.ksdot.gov/bureaus/burtransplan/maps/Traffic.asp"
+ },
+ {
+  "c": "KY",
+  "u": "https://transportation.ky.gov/Planning/Pages/Traffic-Counts.aspx",
+  "status": 200,
+  "final": "https://transportation.ky.gov/Planning/Pages/Traffic-Counts.aspx"
+ },
+ {
+  "c": "LA",
+  "u": "https://www.dotd.la.gov/",
+  "status": 200,
+  "final": "https://dotd.la.gov/"
+ },
+ {
+  "c": "ME",
+  "u": "https://www.maine.gov/mdot/traffic/",
+  "status": 403,
+  "final": "https://www.maine.gov/mdot/traffic/"
+ },
+ {
+  "c": "MD",
+  "u": "https://roadwaydata.mdot.maryland.gov/",
+  "status": "ERR",
+  "err": "ENOTFOUND"
+ },
+ {
+  "c": "MA",
+  "u": "https://www.mass.gov/info-details/massdot-traffic-volume-counts",
+  "status": 404,
+  "final": "https://www.mass.gov/info-details/massdot-traffic-volume-counts"
+ },
+ {
+  "c": "MI",
+  "u": "https://www.michigan.gov/mdot/",
+  "status": 200,
+  "final": "https://www.michigan.gov/mdot/"
+ },
+ {
+  "c": "MN",
+  "u": "https://www.dot.state.mn.us/traffic/data/",
+  "status": 200,
+  "final": "https://www.dot.state.mn.us/traffic/data/"
+ },
+ {
+  "c": "MS",
+  "u": "https://mdot.ms.gov/",
+  "status": 200,
+  "final": "https://mdot.ms.gov/"
+ },
+ {
+  "c": "MO",
+  "u": "https://www.modot.org/traffic-volume-maps",
+  "status": 200,
+  "final": "https://www.modot.org/traffic-volume-maps"
+ },
+ {
+  "c": "MT",
+  "u": "https://www.mdt.mt.gov/publications/datastats/",
+  "status": 403,
+  "final": "https://www.mdt.mt.gov/publications/datastats/"
+ },
+ {
+  "c": "NE",
+  "u": "https://dot.nebraska.gov/travel/traffic-counting/",
+  "status": 404,
+  "final": "https://dot.nebraska.gov/travel/traffic-counting/"
+ },
+ {
+  "c": "NV",
+  "u": "https://www.dot.nv.gov/",
+  "status": 200,
+  "final": "https://www.dot.nv.gov/"
+ },
+ {
+  "c": "NH",
+  "u": "https://www.nh.gov/dot/org/operations/traffic/",
+  "status": 404,
+  "final": "https://www.nh.gov/dot/org/operations/traffic/"
+ },
+ {
+  "c": "NJ",
+  "u": "https://www.nj.gov/transportation/refdata/",
+  "status": 200,
+  "final": "https://www.nj.gov/transportation/refdata/"
+ },
+ {
+  "c": "NM",
+  "u": "https://www.dot.nm.gov/",
+  "status": 200,
+  "final": "https://www.dot.nm.gov/"
+ },
+ {
+  "c": "NY",
+  "u": "https://www.dot.ny.gov/tdv",
+  "status": 200,
+  "final": "https://www.dot.ny.gov/tdv"
+ },
+ {
+  "c": "NC",
+  "u": "https://www.ncdot.gov/",
+  "status": 200,
+  "final": "https://www.ncdot.gov/Pages/default.aspx"
+ },
+ {
+  "c": "ND",
+  "u": "https://www.dot.nd.gov/",
+  "status": 200,
+  "final": "https://www.dot.nd.gov/"
+ },
+ {
+  "c": "OH",
+  "u": "https://www.transportation.ohio.gov/",
+  "status": 404,
+  "final": "https://www.transportation.ohio.gov/"
+ },
+ {
+  "c": "OK",
+  "u": "https://oklahoma.gov/odot.html",
+  "status": 200,
+  "final": "https://oklahoma.gov/odot.html"
+ },
+ {
+  "c": "OR",
+  "u": "https://www.oregon.gov/odot/data/pages/traffic-counting.aspx",
+  "status": 200,
+  "final": "https://www.oregon.gov/odot/data/pages/traffic-counting.aspx"
+ },
+ {
+  "c": "PA",
+  "u": "https://www.pa.gov/agencies/penndot",
+  "status": 200,
+  "final": "https://www.pa.gov/agencies/penndot"
+ },
+ {
+  "c": "RI",
+  "u": "https://www.dot.ri.gov/",
+  "status": 200,
+  "final": "https://www.dot.ri.gov/"
+ },
+ {
+  "c": "SC",
+  "u": "https://www.scdot.org/",
+  "status": 200,
+  "final": "https://www.scdot.org/"
+ },
+ {
+  "c": "SD",
+  "u": "https://dot.sd.gov/",
+  "status": 200,
+  "final": "https://dot.sd.gov/"
+ },
+ {
+  "c": "TN",
+  "u": "https://www.tn.gov/tdot/",
+  "status": 403,
+  "final": "https://www.tn.gov/tdot/"
+ },
+ {
+  "c": "TX",
+  "u": "https://gisdata-txdot.opendata.arcgis.com/",
+  "status": 200,
+  "final": "https://gisdata-txdot.opendata.arcgis.com/"
+ },
+ {
+  "c": "UT",
+  "u": "https://data-uplan.opendata.arcgis.com/",
+  "status": 200,
+  "final": "https://data-uplan.opendata.arcgis.com/"
+ },
+ {
+  "c": "VT",
+  "u": "https://vtrans.vermont.gov/",
+  "status": 200,
+  "final": "https://vtrans.vermont.gov/"
+ },
+ {
+  "c": "VA",
+  "u": "https://www.virginiadot.org/info/ct-TrafficCounts.asp",
+  "status": 200,
+  "final": "https://www.vdot.virginia.gov/doing-business/technical-guidance-and-support/traffic-operations/traffic-counts/"
+ },
+ {
+  "c": "WA",
+  "u": "https://wsdot.wa.gov/about/data",
+  "status": 200,
+  "final": "https://wsdot.wa.gov/about/data/"
+ },
+ {
+  "c": "WV",
+  "u": "https://transportation.wv.gov/",
+  "status": 200,
+  "final": "https://transportation.wv.gov/"
+ },
+ {
+  "c": "WI",
+  "u": "https://wisconsindot.gov/Pages/projects/data-plan/traffic-counts/default.aspx",
+  "status": 404,
+  "final": "https://wisconsindot.gov/Pages/projects/data-plan/traffic-counts/default.aspx"
+ },
+ {
+  "c": "WY",
+  "u": "https://www.dot.state.wy.us/",
+  "status": 200,
+  "final": "https://www.dot.state.wy.us/home.html"
+ }
+]

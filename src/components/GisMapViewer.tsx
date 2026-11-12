@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { 
   ZoomIn, 
   ZoomOut, 
@@ -20,7 +20,11 @@ import {
 import { TrafficSegment, ContinuousCountStation, StateConfig } from '../types/traffic';
 import { DETAILED_STATE_BOUNDARIES, MAJOR_WATERWAYS } from '../data/geographicBoundaries';
 
+export interface MapViewport { bbox: [number, number, number, number]; zoom: number } // [minLng, minLat, maxLng, maxLat]
+
 interface GisMapViewerProps {
+  /** Called (debounced) when pan/zoom changes, so the host can load only the visible segments. */
+  onViewportChange?: (v: MapViewport) => void;
   stateConfig: StateConfig;
   segments: TrafficSegment[];
   stations: ContinuousCountStation[];
@@ -36,6 +40,7 @@ interface GisMapViewerProps {
 export const GisMapViewer: React.FC<GisMapViewerProps> = ({
   stateConfig,
   segments,
+  onViewportChange,
   stations,
   selectedSegments,
   selectedStation,
@@ -95,6 +100,37 @@ export const GisMapViewer: React.FC<GisMapViewerProps> = ({
     const y = ((effectiveMaxLat - lat) / (effectiveMaxLat - effectiveMinLat)) * (height - 100) + 50;
     return [x, y];
   };
+
+  // Report the visible geographic window (inverse of project() and the CSS pan/zoom transform)
+  useEffect(() => {
+    if (!onViewportChange) return;
+    const t = setTimeout(() => {
+      const el = containerRef.current;
+      if (!el) return;
+      const { width: cw, height: ch } = el.getBoundingClientRect();
+      if (!cw || !ch) return;
+      const k = Math.min(cw / width, ch / height); // svg uses preserveAspectRatio meet, centred
+      const toSvg = (px: number, py: number): [number, number] => [
+        (px - pan.x - cw / 2) / zoom / k + width / 2,
+        (py - pan.y - ch / 2) / zoom / k + height / 2
+      ];
+      const { minLng, maxLng, minLat, maxLat } = stateConfig.bounds;
+      const padLng = (maxLng - minLng) * 0.08, padLat = (maxLat - minLat) * 0.08;
+      const eMinLng = minLng - padLng, eMaxLng = maxLng + padLng, eMinLat = minLat - padLat, eMaxLat = maxLat + padLat;
+      const unproject = (x: number, y: number): [number, number] => [
+        eMinLng + ((x - 50) / (width - 100)) * (eMaxLng - eMinLng),
+        eMaxLat - ((y - 50) / (height - 100)) * (eMaxLat - eMinLat)
+      ];
+      const [x0, y0] = toSvg(0, 0), [x1, y1] = toSvg(cw, ch);
+      const a = unproject(x0, y0), b = unproject(x1, y1);
+      const padX = Math.abs(b[0] - a[0]) * 0.1, padY = Math.abs(a[1] - b[1]) * 0.1; // small margin so edges don't pop in
+      onViewportChange({
+        bbox: [Math.min(a[0], b[0]) - padX, Math.min(a[1], b[1]) - padY, Math.max(a[0], b[0]) + padX, Math.max(a[1], b[1]) + padY],
+        zoom
+      });
+    }, 250);
+    return () => clearTimeout(t);
+  }, [zoom, pan.x, pan.y, stateConfig.code, onViewportChange]);
 
   // Filter segments for active state
   const stateSegments = useMemo(() => {

@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { trafficDb, DatabaseStats, CustomCountRecord } from '../services/db';
 import { downloadFile } from '../utils/exportUtils';
+import { exportUserState, mergeUserState } from '../services/userState';
 import { MoDOTMapDocument, TrafficSegment, ContinuousCountStation, ArchivedItem } from '../types/traffic';
 
 interface DatabaseManagerProps {
@@ -32,6 +33,7 @@ export const DatabaseManager: React.FC<DatabaseManagerProps> = ({ onDatabaseChan
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const stateInputRef = useRef<HTMLInputElement>(null);
 
   const loadData = async () => {
     setIsLoading(true);
@@ -86,6 +88,31 @@ export const DatabaseManager: React.FC<DatabaseManagerProps> = ({ onDatabaseChan
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
+  // Notes & settings sync file (small, mergeable; never contains the built traffic data)
+  const handleExportState = async () => {
+    const { json, counts } = await exportUserState();
+    downloadFile(json, `traffic-archive-notes-settings_${new Date().toISOString().slice(0, 10)}.json`, 'application/json');
+    setStatusMessage({ text: `Notes & settings exported: ${counts.archives} archives, ${counts.custom_counts} custom counts, ${counts.settings} settings, ${counts.deletions} deletions.`, type: 'success' });
+  };
+  const handleStateFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async (ev) => {
+      const text = ev.target?.result as string;
+      const prev = await mergeUserState(text, true);
+      if (!prev.ok || !prev.summary) { setStatusMessage({ text: prev.message, type: 'error' }); return; }
+      const m = prev.summary;
+      if (!window.confirm(`Merge notes & settings?\n\nAdd ${m.added}, update ${m.updated}, delete ${m.deleted}, unchanged ${m.unchanged}, settings ${m.settings}.\nNewer edits win; nothing newer on this device is overwritten.`)) return;
+      const res = await mergeUserState(text, false);
+      setStatusMessage({ text: res.ok ? `Merged: ${m.added} added, ${m.updated} updated, ${m.deleted} deleted.` : res.message, type: res.ok ? 'success' : 'error' });
+      await loadData();
+      onDatabaseChanged();
+    };
+    reader.readAsText(file);
+    if (stateInputRef.current) stateInputRef.current.value = '';
+  };
+
   // Handle Reset Database
   const handleReset = async () => {
     if (!window.confirm('Reset database to official MoDOT factory defaults? All custom counts will be cleared.')) {
@@ -123,6 +150,8 @@ export const DatabaseManager: React.FC<DatabaseManagerProps> = ({ onDatabaseChan
         className="hidden"
       />
 
+      <input type="file" ref={stateInputRef} onChange={handleStateFile} accept=".json" className="hidden" />
+
       {/* Top Header & DB Actions */}
       <div className="p-5 bg-slate-900 border-b border-slate-800 space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-4">
@@ -138,7 +167,25 @@ export const DatabaseManager: React.FC<DatabaseManagerProps> = ({ onDatabaseChan
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={() => stateInputRef.current?.click()}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded text-xs font-medium transition"
+              title="Merge a notes & settings file from another device"
+            >
+              <Upload className="w-3.5 h-3.5 text-amber-400" />
+              <span>Merge Notes & Settings</span>
+            </button>
+
+            <button
+              onClick={handleExportState}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded text-xs font-medium transition"
+              title="Small file with your archives, notes, custom counts and settings (no traffic data)"
+            >
+              <Download className="w-3.5 h-3.5 text-amber-400" />
+              <span>Export Notes & Settings</span>
+            </button>
+
             <button
               onClick={() => fileInputRef.current?.click()}
               className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded text-xs font-medium transition"

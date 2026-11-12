@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   Table, 
   Search, 
@@ -40,6 +40,9 @@ export const DataGridTable: React.FC<DataGridTableProps> = ({
   const [selectedDistrict, setSelectedDistrict] = useState<string>('all');
   const [minAadt, setMinAadt] = useState<number>(0);
   const [minTruckPercent, setMinTruckPercent] = useState<number>(0);
+
+  // Only the first N rows are put in the DOM (states can hold tens of thousands of segments)
+  const [visibleCount, setVisibleCount] = useState<number>(250);
 
   // Sorting
   const [sortField, setSortField] = useState<SortField>('aadtCurrent');
@@ -95,6 +98,8 @@ export const DataGridTable: React.FC<DataGridTableProps> = ({
         return sortDirection === 'asc' ? valA - valB : valB - valA;
       });
   }, [segments, selectedDistrict, minAadt, minTruckPercent, searchQuery, sortField, sortDirection]);
+
+  useEffect(() => { setVisibleCount(250); }, [selectedDistrict, minAadt, minTruckPercent, searchQuery, sortField, sortDirection]);
 
   // Handle Save Custom Count
   const handleSaveCustomCount = async (e: React.FormEvent) => {
@@ -291,7 +296,7 @@ export const DataGridTable: React.FC<DataGridTableProps> = ({
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-850">
-            {processedSegments.map((seg) => (
+            {processedSegments.slice(0, visibleCount).map((seg) => (
               <tr 
                 key={seg.id}
                 onClick={() => onSelectSegment(seg)}
@@ -350,6 +355,13 @@ export const DataGridTable: React.FC<DataGridTableProps> = ({
             ))}
           </tbody>
         </table>
+        {processedSegments.length > visibleCount && (
+          <div className="flex items-center justify-center gap-3 py-3 text-xs text-slate-400">
+            <span>Showing {visibleCount.toLocaleString()} of {processedSegments.length.toLocaleString()}</span>
+            <button onClick={() => setVisibleCount((n) => n + 500)} className="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200">Show 500 more</button>
+            <button onClick={() => setVisibleCount(processedSegments.length)} className="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200">Show all</button>
+          </div>
+        )}
       </div>
 
       {/* Record Custom Count Modal */}

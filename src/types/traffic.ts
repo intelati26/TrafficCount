@@ -43,7 +43,9 @@ export type FunctionalClass =
   | 'Freeway & Expressway'
   | 'Other Principal Arterial'
   | 'Minor Arterial'
-  | 'Major Collector';
+  | 'Major Collector'
+  | 'Minor Collector'
+  | 'Local';
 
 export interface TrafficSegment {
   id: string;
@@ -72,6 +74,8 @@ export interface TrafficSegment {
   aadt2020: number; // COVID dip
   aadt2019: number; // pre-COVID baseline
   aadt2018: number;
+  /** Every year available from the source (Parquet builds can hold 20+ years). Keys are years. */
+  aadtHistory?: Record<number, number>;
   
   // Commercial & Classification metrics
   commercialAadt: number;

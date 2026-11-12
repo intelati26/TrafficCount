@@ -22,7 +22,7 @@ import { DatabaseStats } from '../services/db';
 import { StateConfig } from '../types/traffic';
 import { usePWAInstall } from '../hooks/usePWAInstall';
 
-export type ActiveView = 'map' | 'documents' | 'database_grid' | 'telemetry' | 'trends' | 'db_manager';
+export type ActiveView = 'map' | 'documents' | 'database_grid' | 'telemetry' | 'trends' | 'db_manager' | 'data_packs';
 
 interface HeaderProps {
   activeView: ActiveView;
@@ -52,6 +52,7 @@ export const Header: React.FC<HeaderProps> = ({
     { id: 'database_grid', label: 'AADT Query Grid', icon: <Table className="w-3.5 h-3.5" /> },
     { id: 'telemetry', label: 'ATR Telemetry', icon: <Activity className="w-3.5 h-3.5" /> },
     { id: 'trends', label: 'Corridor Growth', icon: <TrendingUp className="w-3.5 h-3.5" /> },
+    { id: 'data_packs', label: 'Data Packs', icon: <DownloadCloud className="w-3.5 h-3.5" /> },
     { id: 'db_manager', label: 'Database Vault', icon: <Database className="w-3.5 h-3.5" /> }
   ];
 
