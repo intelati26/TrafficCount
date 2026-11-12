@@ -54,8 +54,6 @@ jobs:
     needs: [no-data-guard, check]
     runs-on: ubuntu-latest
     timeout-minutes: 60
-    env:
-      PREFLIGHT_TMP: ${{ runner.temp }}/preflight   # throwaway; deleted with the runner
     steps:
       - uses: actions/checkout@v4
       - uses: denoland/setup-deno@v2
@@ -64,6 +62,8 @@ jobs:
       - run: deno install
       - name: Preflight (first page of every source, validated, nothing kept)
         run: |
+          # throwaway folder on the runner (the runner context is not available in job-level env, so use the variable here)
+          export PREFLIGHT_TMP="$RUNNER_TEMP/preflight"
           mkdir -p "$PREFLIGHT_TMP"
           deno run -A npm:tsx scripts/preflight.ts
       - name: Summary
