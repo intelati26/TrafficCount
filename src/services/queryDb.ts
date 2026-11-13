@@ -151,6 +151,9 @@ export const queryDb = {
   /** True when a built data set exists (manifest found). Never throws. */
   async available(): Promise<boolean> { return !!(await manifest()); },
 
+  /** The shared DuckDB engine (used by the on-device builder to turn fetched rows into Parquet). */
+  async engine(): Promise<DuckDB.AsyncDuckDB> { return getDb(); },
+
   /** Forget cached manifest and file registrations (after importing or removing device data). */
   async reload(): Promise<void> {
     const db = dbP ? await dbP : null;

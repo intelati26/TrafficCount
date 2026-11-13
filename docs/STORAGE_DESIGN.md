@@ -83,3 +83,10 @@ Sort by route + milepost before writing so row-group stats make `WHERE route=...
 - Verified: 20,000 random Arkansas rows x2 geometries round-trip with identical structure and max error 0.56 cm.
 - Existing files can be migrated without refetching: `deno run -A npm:tsx scripts/recompress.ts public/data/q/seg/XX.parquet ...` (row-count checked).
 - No longer GeoParquet: outside tools need geometry exported to WKB/GeoJSON first (`toWKB` in the codec).
+
+## On-device build and import (phones, data-free installs)
+- **Import**: Data Packs > "Import data pack" stores chosen files (seg_XX.parquet, hist_XX.parquet ... plus manifest.json) in the browser's private file storage (OPFS, `src/services/localData.ts`). DuckDB reads them in place; device files override files served with the app.
+- **Build on this device**: Data Packs > "Download and build" fetches a state from FHWA's HPMS service (`src/pipeline/deviceBuild.ts`), turns each feature into the same row the desktop scripts write (`src/pipeline/hpms.ts`, `geom.ts`), loads them into DuckDB in batches, writes zstd Parquet with DuckDB, and saves it to device storage.
+  Verified on Rhode Island against the desktop build: identical geometry (both columns), AADT, route/class, lanes/speed, segment key, flags and truck share for all 56,444 sections, same columns.
+- **Limits**: HPMS only (latest year, no attribute sidecar); native sources (MO, AR, DE, MS) and history stay desktop builds. FHWA's server allows browser requests from the app origin; MoDOT's does not. Large states (over about 500k sections) need a lot of free memory.
+- Keep `src/pipeline/hpms.ts` and `geom.ts` in step with `scripts/arcgis-source.ts` and `scripts/geomcodec.ts`.

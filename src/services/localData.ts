@@ -68,10 +68,27 @@ export async function importFiles(files: File[], onProgress?: (done: number, tot
   return res;
 }
 
-export async function removeLocalState(state: string): Promise<void> {
+/** Delete a state's device files. Call queryDb.reload() first so DuckDB lets go of the file handles, or the delete can fail. Returns the files that could not be removed. */
+export async function removeLocalState(state: string): Promise<string[]> {
   const files = (await readLocalManifest())?.files ?? [];
+  const failed: string[] = [];
   for (const f of files.filter((x) => x.state === state)) {
-    try { const parts = f.file.split('/'); let d = await dir(); for (const p of parts.slice(0, -1)) d = await d.getDirectoryHandle(p); await d.removeEntry(parts.at(-1)!); } catch { /* already gone */ }
+    try { const parts = f.file.split('/'); let d = await dir(); for (const p of parts.slice(0, -1)) d = await d.getDirectoryHandle(p); await d.removeEntry(parts.at(-1)!); }
+    catch (e: any) { if (e?.name !== 'NotFoundError') failed.push(f.file); }
   }
-  await writeLocalManifest(files.filter((x) => x.state !== state));
+  await writeLocalManifest(files.filter((x) => x.state !== state || failed.includes(x.file)));
+  return failed;
+}
+
+/** Save a file produced on this device (e.g. a state built from FHWA by the in-app builder) and register it in the device manifest. */
+export async function saveLocalFile(kind: ManifestFile['kind'], state: string, bytes: Uint8Array, meta: Partial<ManifestFile> & { rows: number }): Promise<void> {
+  if (!localSupported()) throw new Error('This browser cannot keep files on the device (no private file storage).');
+  let d = await dir(true); d = await d.getDirectoryHandle(kind, { create: true });
+  const w = await (await d.getFileHandle(`${state}.parquet`, { create: true })).createWritable();
+  await w.write(bytes as unknown as BufferSource); await w.close();
+  const current = (await readLocalManifest())?.files ?? [];
+  const entry: ManifestFile = { state, kind, file: `${kind}/${state}.parquet`, rows: meta.rows, bytes: bytes.length, years: meta.years, latest: meta.latest, source: meta.source, local: true };
+  const i = current.findIndex((x) => x.state === state && x.kind === kind);
+  if (i >= 0) current[i] = entry; else current.push(entry);
+  await writeLocalManifest(current);
 }

@@ -2,6 +2,9 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { DownloadCloud, FolderDown, CheckCircle2, AlertCircle, Loader2, X } from 'lucide-react';
 import { queryDb, ManifestFile } from '../services/queryDb';
 import { importFiles, removeLocalState, localSupported } from '../services/localData';
+import { buildHpmsOnDevice, type BuildProgress } from '../pipeline/deviceBuild';
+import { HPMS_ROWS } from '../data/hpmsRows';
+import { STATE_META } from '../data/stateMeta';
 
 // Download built states to disk for off-app use or to copy to another device. Files are streamed straight to a chosen folder
 // (File System Access API) so a 70 MB state never sits in memory; browsers without it fall back to one download per file.
@@ -21,6 +24,9 @@ export const DataPacks: React.FC = () => {
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
   const abort = useRef<AbortController | null>(null);
   const importRef = useRef<HTMLInputElement>(null);
+  const buildAbort = useRef<AbortController | null>(null);
+  const [buildState, setBuildState] = useState<string>('RI');
+  const [building, setBuilding] = useState<BuildProgress | null>(null);
   const [importing, setImporting] = useState<{ done: number; total: number; name: string } | null>(null);
   const desktop = isDesktop();
 
@@ -51,9 +57,24 @@ export const DataPacks: React.FC = () => {
     } catch (e: any) { setMsg({ text: e?.message ?? 'Import failed.', ok: false }); }
     finally { setImporting(null); if (importRef.current) importRef.current.value = ''; }
   };
+  const doBuild = async () => {
+    setMsg(null);
+    const ac = new AbortController(); buildAbort.current = ac;
+    setBuilding({ stage: 'finding', pagesDone: 0, pagesTotal: 0, rows: 0 });
+    try {
+      const r = await buildHpmsOnDevice(buildState, { signal: ac.signal, onProgress: setBuilding });
+      await queryDb.reload(); setFiles(await queryDb.manifestFiles());
+      setMsg({ text: `Built ${buildState} on this device: ${r.rows.toLocaleString()} sections (${r.counted.toLocaleString()} with a count), ${mb(r.bytes)}, FHWA HPMS ${r.year}. Reloading so the app picks it up…`, ok: true });
+      setTimeout(() => window.location.reload(), 1500);
+    } catch (e: any) {
+      setMsg({ text: e?.name === 'AbortError' ? 'Build cancelled; nothing was saved.' : `Build failed: ${e?.message ?? e}. FHWA's server is sometimes busy; trying again later usually works.`, ok: false });
+    } finally { setBuilding(null); buildAbort.current = null; }
+  };
   const removeLocal = async (state: string) => {
     if (!window.confirm(`Remove the ${state} data stored on this device?`)) return;
-    await removeLocalState(state); await queryDb.reload(); setFiles(await queryDb.manifestFiles()); setMsg({ text: `Removed ${state} from this device.`, ok: true });
+    await queryDb.reload(); // let DuckDB release the file handles first, otherwise the delete is refused
+    const failed = await removeLocalState(state); await queryDb.reload(); setFiles(await queryDb.manifestFiles());
+    setMsg(failed.length ? { text: `Could not remove ${failed.join(', ')}; reload the page and try again.`, ok: false } : { text: `Removed ${state} from this device.`, ok: true });
   };
 
   const chosen = packs.filter(p => picked.has(p.state) && !p.local);
@@ -124,6 +145,28 @@ export const DataPacks: React.FC = () => {
             <div className="flex flex-wrap gap-2 text-[11px]">
               {localPacks.map(p => (<span key={p.state} className="flex items-center gap-1.5 px-2 py-1 rounded bg-slate-800 border border-slate-700">{p.state} · {mb((p.seg?.bytes ?? 0) + (p.hist?.bytes ?? 0) + (p.attr?.bytes ?? 0))}<button onClick={() => removeLocal(p.state)} className="text-slate-400 hover:text-red-300" title="Remove from this device">✕</button></span>))}
             </div>)}
+        </div>
+      )}
+
+      {localSupported() && (
+        <div className="border border-slate-800 rounded-lg p-3 space-y-2 bg-slate-900/60">
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="font-semibold text-xs">Build on this device</span>
+            <select value={buildState} onChange={(e) => setBuildState(e.target.value)} disabled={!!building} className="bg-slate-950 border border-slate-800 rounded px-2 py-1.5 text-xs">
+              {Object.entries(STATE_META).map(([code, m]) => (<option key={code} value={code}>{m.name} ({code}) · {((HPMS_ROWS[code] ?? 0) / 1000).toFixed(0)}k sections</option>))}
+            </select>
+            {building ? (
+              <button onClick={() => buildAbort.current?.abort()} className="px-3 py-1.5 rounded bg-red-900 hover:bg-red-800 border border-red-700 text-xs">Cancel</button>
+            ) : (
+              <button onClick={doBuild} className="px-3 py-1.5 rounded bg-emerald-600 hover:bg-emerald-700 text-xs font-medium">Download and build</button>
+            )}
+          </div>
+          <p className="text-[11px] text-slate-400">
+            Fetches the state's roads from FHWA's HPMS service and builds the same data file the desktop scripts make, about {Math.max(1, Math.round(((HPMS_ROWS[buildState] ?? 0) * 170) / 1e6))} MB and {Math.max(1, Math.round((HPMS_ROWS[buildState] ?? 0) / 2000 * 0.6 / 60))}+ minutes on a computer (a phone is slower). Needs internet while it runs; keep this screen open.
+            {(HPMS_ROWS[buildState] ?? 0) > 500000 && <span className="text-amber-300"> Large state: it needs a lot of free memory, so a computer is the safer place to build it.</span>}
+          </p>
+          {building && (<div className="space-y-1"><div className="h-2 bg-slate-800 rounded overflow-hidden"><div className="h-full bg-emerald-500" style={{ width: (building.pagesTotal ? Math.round((100 * building.pagesDone) / building.pagesTotal) : 2) + '%' }} /></div>
+            <p className="text-[11px] text-slate-400">{building.stage === 'finding' ? 'Finding the service…' : building.stage === 'fetching' ? `Downloading ${building.pagesDone} of ${building.pagesTotal} pages · ${building.rows.toLocaleString()} sections` : building.stage === 'converting' ? 'Writing the data file…' : building.stage === 'saving' ? `Saving ${mb(building.bytes ?? 0)}…` : 'Done'}</p></div>)}
         </div>
       )}
 
