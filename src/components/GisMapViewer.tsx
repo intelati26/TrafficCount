@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { 
   ZoomIn, 
   ZoomOut, 
@@ -20,7 +20,11 @@ import {
 import { TrafficSegment, ContinuousCountStation, StateConfig } from '../types/traffic';
 import { DETAILED_STATE_BOUNDARIES, MAJOR_WATERWAYS } from '../data/geographicBoundaries';
 
+export interface MapViewport { bbox: [number, number, number, number]; zoom: number; historical?: boolean } // [minLng, minLat, maxLng, maxLat]
+
 interface GisMapViewerProps {
+  /** Called (debounced) when pan/zoom changes, so the host can load only the visible segments. */
+  onViewportChange?: (v: MapViewport) => void;
   stateConfig: StateConfig;
   segments: TrafficSegment[];
   stations: ContinuousCountStation[];
@@ -36,6 +40,7 @@ interface GisMapViewerProps {
 export const GisMapViewer: React.FC<GisMapViewerProps> = ({
   stateConfig,
   segments,
+  onViewportChange,
   stations,
   selectedSegments,
   selectedStation,
@@ -48,6 +53,12 @@ export const GisMapViewer: React.FC<GisMapViewerProps> = ({
   const [zoom, setZoom] = useState<number>(1);
   const [pan, setPan] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState<boolean>(false);
+  // pan/zoom are applied straight to the SVG element while dragging (no React re-render of tens of thousands of segments per mouse move)
+  const svgRef = useRef<SVGSVGElement>(null);
+  const panRef = useRef({ x: 0, y: 0 });
+  const zoomRef = useRef(1);
+  const dragRef = useRef<{ sx: number; sy: number } | null>(null);
+  const pinchRef = useRef<{ d: number; z: number } | null>(null);
   const [dragStart, setDragStart] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
 
   // Layer toggles & simplified filters
@@ -62,8 +73,11 @@ export const GisMapViewer: React.FC<GisMapViewerProps> = ({
   const [showNeighbors, setShowNeighbors] = useState<boolean>(true);
   const [showCities, setShowCities] = useState<boolean>(true);
   const [showShields, setShowShields] = useState<boolean>(true);
+  // by default the map draws the current network; older-era segments overlap it, so they are an opt-in layer
+  const [showHistorical, setShowHistorical] = useState<boolean>(false);
   const [multiSelectMode, setMultiSelectMode] = useState<boolean>(false);
-  const [isLegendExpanded, setIsLegendExpanded] = useState<boolean>(true);
+  // the legend covers a third of a phone screen: start collapsed on narrow screens
+  const [isLegendExpanded, setIsLegendExpanded] = useState<boolean>(() => typeof window === 'undefined' || window.innerWidth >= 768);
   const [isLayerMenuOpen, setIsLayerMenuOpen] = useState<boolean>(false);
 
   const [hoveredItem, setHoveredItem] = useState<{
@@ -95,6 +109,37 @@ export const GisMapViewer: React.FC<GisMapViewerProps> = ({
     const y = ((effectiveMaxLat - lat) / (effectiveMaxLat - effectiveMinLat)) * (height - 100) + 50;
     return [x, y];
   };
+
+  // Report the visible geographic window (inverse of project() and the CSS pan/zoom transform)
+  useEffect(() => {
+    if (!onViewportChange) return;
+    const t = setTimeout(() => {
+      const el = containerRef.current;
+      if (!el) return;
+      const { width: cw, height: ch } = el.getBoundingClientRect();
+      if (!cw || !ch) return;
+      const k = Math.min(cw / width, ch / height); // svg uses preserveAspectRatio meet, centred
+      const toSvg = (px: number, py: number): [number, number] => [
+        (px - pan.x - cw / 2) / zoom / k + width / 2,
+        (py - pan.y - ch / 2) / zoom / k + height / 2
+      ];
+      const { minLng, maxLng, minLat, maxLat } = stateConfig.bounds;
+      const padLng = (maxLng - minLng) * 0.08, padLat = (maxLat - minLat) * 0.08;
+      const eMinLng = minLng - padLng, eMaxLng = maxLng + padLng, eMinLat = minLat - padLat, eMaxLat = maxLat + padLat;
+      const unproject = (x: number, y: number): [number, number] => [
+        eMinLng + ((x - 50) / (width - 100)) * (eMaxLng - eMinLng),
+        eMaxLat - ((y - 50) / (height - 100)) * (eMaxLat - eMinLat)
+      ];
+      const [x0, y0] = toSvg(0, 0), [x1, y1] = toSvg(cw, ch);
+      const a = unproject(x0, y0), b = unproject(x1, y1);
+      const padX = Math.abs(b[0] - a[0]) * 0.1, padY = Math.abs(a[1] - b[1]) * 0.1; // small margin so edges don't pop in
+      onViewportChange({
+        bbox: [Math.min(a[0], b[0]) - padX, Math.min(a[1], b[1]) - padY, Math.max(a[0], b[0]) + padX, Math.max(a[1], b[1]) + padY],
+        zoom, historical: showHistorical
+      });
+    }, 250);
+    return () => clearTimeout(t);
+  }, [zoom, pan.x, pan.y, stateConfig.code, onViewportChange, showHistorical]);
 
   // Filter segments for active state
   const stateSegments = useMemo(() => {
@@ -208,33 +253,65 @@ export const GisMapViewer: React.FC<GisMapViewerProps> = ({
   }, [stateConfig, showRivers]);
 
   // Pan handlers
+  const applyTransform = () => { if (svgRef.current) svgRef.current.style.transform = `translate(${panRef.current.x}px, ${panRef.current.y}px) scale(${zoomRef.current})`; };
   const handleMouseDown = (e: React.MouseEvent) => {
     if (e.button !== 0) return;
+    dragRef.current = { sx: e.clientX - panRef.current.x, sy: e.clientY - panRef.current.y };
     setIsDragging(true);
-    setDragStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
-    if (isDragging) {
-      setPan({
-        x: e.clientX - dragStart.x,
-        y: e.clientY - dragStart.y
-      });
-    }
+    if (!dragRef.current) return;
+    panRef.current = { x: e.clientX - dragRef.current.sx, y: e.clientY - dragRef.current.sy };
+    applyTransform();
   };
 
   const handleMouseUp = () => {
+    if (!dragRef.current) return;
+    dragRef.current = null;
+    setPan({ ...panRef.current }); // commit once, so the visible-area query and saved state see the final position
     setIsDragging(false);
   };
 
-  const handleWheel = (e: React.WheelEvent) => {
-    e.preventDefault();
-    const factor = e.deltaY < 0 ? 1.15 : 0.87;
-    setZoom((prev) => Math.min(Math.max(prev * factor, 0.7), 4.5));
+  // Touch: one finger pans, two fingers pinch-zoom (phones / the Android app)
+  const touchDist = (t: React.TouchList) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length === 1) { dragRef.current = { sx: e.touches[0].clientX - panRef.current.x, sy: e.touches[0].clientY - panRef.current.y }; setIsDragging(true); }
+    else if (e.touches.length === 2) { dragRef.current = null; pinchRef.current = { d: touchDist(e.touches), z: zoomRef.current }; }
   };
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (e.touches.length === 2 && pinchRef.current) {
+      zoomRef.current = Math.min(Math.max(pinchRef.current.z * (touchDist(e.touches) / pinchRef.current.d), 0.7), 4.5);
+      applyTransform();
+    } else if (e.touches.length === 1 && dragRef.current) {
+      panRef.current = { x: e.touches[0].clientX - dragRef.current.sx, y: e.touches[0].clientY - dragRef.current.sy };
+      applyTransform();
+    }
+  };
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (e.touches.length > 0) return;
+    if (pinchRef.current) { pinchRef.current = null; setZoom(zoomRef.current); }
+    if (dragRef.current) { dragRef.current = null; setIsDragging(false); }
+    setPan({ ...panRef.current });
+  };
+
+  // wheel must be a non-passive native listener, otherwise preventDefault throws a console error on every tick
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      zoomRef.current = Math.min(Math.max(zoomRef.current * (e.deltaY < 0 ? 1.15 : 0.87), 0.7), 4.5);
+      applyTransform();
+      setZoom(zoomRef.current);
+    };
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+  }, []);
 
   const resetView = () => {
     setZoom(1);
+    zoomRef.current = 1; panRef.current = { x: 0, y: 0 };
     setPan({ x: 0, y: 0 });
     setDistrictFilter('all');
     setRouteTypeFilter('all');
@@ -264,6 +341,138 @@ export const GisMapViewer: React.FC<GisMapViewerProps> = ({
   const selectedIds = useMemo(() => {
     return new Set(selectedSegments.map((s) => s.id));
   }, [selectedSegments]);
+
+  // The segment layer is built once and reused while panning, zooming or hovering: it can hold 10,000+ segments.
+  // Route shields only appear zoomed in (a shield on every Interstate segment made the whole state unreadable and unpannable).
+  const shieldsOn = showShields && zoom >= 2.2;
+  const dense = filteredSegments.length > 4000;
+  const zoomBucket = Math.max(0.5, Math.round(zoom * 2) / 2);
+  const segmentLayer = useMemo(() => {
+  // one shield per route per screen cell, so a long highway shows a few badges instead of one per segment
+  const taken = new Set<string>(); const cell = 130 / zoomBucket;
+  const takeShield = (route: string, x: number, y: number) => { const k = `${route}|${Math.floor(x / cell)}|${Math.floor(y / cell)}`; if (taken.has(k)) return false; taken.add(k); return true; };
+  return (
+  <g className="traffic-segments">
+    {filteredSegments.map((seg) => {
+      const isSelected = selectedIds.has(seg.id);
+      const pathString = seg.coordinates
+        .map((pt, i) => {
+          const [px, py] = project(pt[0], pt[1]);
+          return `${i === 0 ? 'M' : 'L'} ${px.toFixed(1)} ${py.toFixed(1)}`;
+        })
+        .join(' ');
+
+      const strokeColor = isSelected ? '#38bdf8' : getTrafficColor(seg.aadtCurrent);
+      const strokeWidth = isSelected 
+        ? getTrafficStrokeWidth(seg.aadtCurrent) + 2.8 
+        : getTrafficStrokeWidth(seg.aadtCurrent);
+
+      // Center point for route shield
+      const [shieldX, shieldY] = project(seg.centerPoint[0], seg.centerPoint[1]);
+
+      return (
+        <g 
+          key={seg.id}
+          className="cursor-pointer transition-opacity"
+          onClick={(e) => {
+            e.stopPropagation();
+            const isMulti = e.shiftKey || multiSelectMode;
+            onSelectSegment(seg, isMulti);
+          }}
+          onMouseEnter={(e) => {
+            const rect = containerRef.current?.getBoundingClientRect();
+            if (rect) {
+              setHoveredItem({
+                type: 'segment',
+                data: seg,
+                x: e.clientX - rect.left,
+                y: e.clientY - rect.top
+              });
+            }
+          }}
+          onMouseLeave={() => setHoveredItem(null)}
+        >
+          {/* Invisible wide hit target for effortless clicks */}
+          <path
+            d={pathString}
+            fill="none"
+            stroke="transparent"
+            strokeWidth={Math.max(strokeWidth + 14, 18)}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+
+          {/* Halo when selected */}
+          {isSelected && (
+            <path
+              d={pathString}
+              fill="none"
+              stroke="#38bdf8"
+              strokeWidth={strokeWidth + 4}
+              strokeOpacity="0.45"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              filter="url(#corridorGlow)"
+            />
+          )}
+
+          {/* Crisp Highway Bandwidth Line */}
+          <path
+            d={pathString}
+            fill="none"
+            stroke={strokeColor}
+            strokeWidth={strokeWidth}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeOpacity={isSelected ? 1 : 0.9}
+          />
+
+          {/* Highway Route Shield on Key Segments */}
+          {shieldsOn && (seg.route.startsWith('I-') || seg.route.startsWith('US-')) && takeShield(seg.route, shieldX, shieldY) && (
+            <g transform={`translate(${shieldX}, ${shieldY})`} className="pointer-events-none">
+              {seg.route.startsWith('I-') ? (
+                // Interstate Shield Badge
+                <g transform="translate(-11, -8)">
+                  <rect width="22" height="15" rx="3" fill="#1e3a8a" stroke="#ffffff" strokeWidth="0.8" />
+                  <path d="M 0 0 L 22 0 L 22 4 L 0 4 Z" fill="#dc2626" rx="3" />
+                  <text 
+                    x="11" 
+                    y="12" 
+                    fill="#ffffff" 
+                    fontSize="8" 
+                    fontWeight="800" 
+                    textAnchor="middle"
+                    fontFamily="monospace"
+                  >
+                    {seg.route.replace('I-', '')}
+                  </text>
+                </g>
+              ) : (
+                // US Route Shield Badge
+                <g transform="translate(-11, -8)">
+                  <rect width="22" height="15" rx="3" fill="#ffffff" stroke="#1e293b" strokeWidth="0.8" />
+                  <text 
+                    x="11" 
+                    y="11.5" 
+                    fill="#0f172a" 
+                    fontSize="8" 
+                    fontWeight="800" 
+                    textAnchor="middle"
+                    fontFamily="monospace"
+                  >
+                    {seg.route.replace('US-', '')}
+                  </text>
+                </g>
+              )}
+            </g>
+          )}
+        </g>
+      );
+    })}
+  </g>
+  );
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filteredSegments, selectedIds, mapStyle, shieldsOn, zoomBucket, dense, multiSelectMode, onSelectSegment, stateConfig]);
 
   return (
     <div className="flex flex-col h-full bg-[#070b14] text-slate-100 overflow-hidden select-none font-sans">
@@ -461,6 +670,15 @@ export const GisMapViewer: React.FC<GisMapViewerProps> = ({
                     className="rounded bg-slate-800 border-slate-700 text-sky-500 focus:ring-0"
                   />
                 </label>
+                <label className="flex items-center justify-between px-2 py-1 rounded hover:bg-slate-800 cursor-pointer" title="Also draw segments whose newest count is from an earlier year (older road segmentation; overlaps the current network)">
+                  <span className="text-slate-300">Counted only in earlier years</span>
+                  <input
+                    type="checkbox"
+                    checked={showHistorical}
+                    onChange={(e) => setShowHistorical(e.target.checked)}
+                    className="rounded bg-slate-800 border-slate-700 text-sky-500 focus:ring-0"
+                  />
+                </label>
               </div>
             )}
           </div>
@@ -484,15 +702,20 @@ export const GisMapViewer: React.FC<GisMapViewerProps> = ({
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
-        onWheel={handleWheel}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        style={{ touchAction: 'none' }}
       >
         <svg
+          ref={svgRef}
           viewBox={`0 0 ${width} ${height}`}
           className="w-full h-full"
           style={{
             transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
             transformOrigin: 'center center',
-            transition: isDragging ? 'none' : 'transform 0.1s ease-out'
+            transition: isDragging ? 'none' : 'transform 0.1s ease-out',
+            willChange: 'transform'
           }}
         >
           <defs>
@@ -663,124 +886,7 @@ export const GisMapViewer: React.FC<GisMapViewerProps> = ({
           )}
 
           {/* 5. Highway Traffic Segments (Simplified & High-Legibility) */}
-          <g className="traffic-segments">
-            {filteredSegments.map((seg) => {
-              const isSelected = selectedIds.has(seg.id);
-              const pathString = seg.coordinates
-                .map((pt, i) => {
-                  const [px, py] = project(pt[0], pt[1]);
-                  return `${i === 0 ? 'M' : 'L'} ${px.toFixed(1)} ${py.toFixed(1)}`;
-                })
-                .join(' ');
-
-              const strokeColor = isSelected ? '#38bdf8' : getTrafficColor(seg.aadtCurrent);
-              const strokeWidth = isSelected 
-                ? getTrafficStrokeWidth(seg.aadtCurrent) + 2.8 
-                : getTrafficStrokeWidth(seg.aadtCurrent);
-
-              // Center point for route shield
-              const [shieldX, shieldY] = project(seg.centerPoint[0], seg.centerPoint[1]);
-
-              return (
-                <g 
-                  key={seg.id}
-                  className="cursor-pointer transition-opacity"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    const isMulti = e.shiftKey || multiSelectMode;
-                    onSelectSegment(seg, isMulti);
-                  }}
-                  onMouseEnter={(e) => {
-                    const rect = containerRef.current?.getBoundingClientRect();
-                    if (rect) {
-                      setHoveredItem({
-                        type: 'segment',
-                        data: seg,
-                        x: e.clientX - rect.left,
-                        y: e.clientY - rect.top
-                      });
-                    }
-                  }}
-                  onMouseLeave={() => setHoveredItem(null)}
-                >
-                  {/* Invisible wide hit target for effortless clicks */}
-                  <path
-                    d={pathString}
-                    fill="none"
-                    stroke="transparent"
-                    strokeWidth={Math.max(strokeWidth + 14, 18)}
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-
-                  {/* Halo when selected */}
-                  {isSelected && (
-                    <path
-                      d={pathString}
-                      fill="none"
-                      stroke="#38bdf8"
-                      strokeWidth={strokeWidth + 4}
-                      strokeOpacity="0.45"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      filter="url(#corridorGlow)"
-                    />
-                  )}
-
-                  {/* Crisp Highway Bandwidth Line */}
-                  <path
-                    d={pathString}
-                    fill="none"
-                    stroke={strokeColor}
-                    strokeWidth={strokeWidth}
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeOpacity={isSelected ? 1 : 0.9}
-                  />
-
-                  {/* Highway Route Shield on Key Segments */}
-                  {showShields && (seg.route.startsWith('I-') || seg.route.startsWith('US-')) && (
-                    <g transform={`translate(${shieldX}, ${shieldY})`} className="pointer-events-none">
-                      {seg.route.startsWith('I-') ? (
-                        // Interstate Shield Badge
-                        <g transform="translate(-11, -8)">
-                          <rect width="22" height="15" rx="3" fill="#1e3a8a" stroke="#ffffff" strokeWidth="0.8" />
-                          <path d="M 0 0 L 22 0 L 22 4 L 0 4 Z" fill="#dc2626" rx="3" />
-                          <text 
-                            x="11" 
-                            y="12" 
-                            fill="#ffffff" 
-                            fontSize="8" 
-                            fontWeight="800" 
-                            textAnchor="middle"
-                            fontFamily="monospace"
-                          >
-                            {seg.route.replace('I-', '')}
-                          </text>
-                        </g>
-                      ) : (
-                        // US Route Shield Badge
-                        <g transform="translate(-11, -8)">
-                          <rect width="22" height="15" rx="3" fill="#ffffff" stroke="#1e293b" strokeWidth="0.8" />
-                          <text 
-                            x="11" 
-                            y="11.5" 
-                            fill="#0f172a" 
-                            fontSize="8" 
-                            fontWeight="800" 
-                            textAnchor="middle"
-                            fontFamily="monospace"
-                          >
-                            {seg.route.replace('US-', '')}
-                          </text>
-                        </g>
-                      )}
-                    </g>
-                  )}
-                </g>
-              );
-            })}
-          </g>
+          {segmentLayer}
 
           {/* 6. Continuous Count Stations (Sensors) */}
           {filteredStations.map((sta) => {

@@ -1,208 +1,137 @@
-import React, { useState } from 'react';
-import { 
-  TrendingUp, 
-  TrendingDown, 
-  ArrowRight, 
-  Calendar, 
-  Truck, 
-  FileText, 
-  Download, 
-  CheckCircle,
-  AlertTriangle,
-  Info
-} from 'lucide-react';
-import { CORRIDOR_COMPARISONS } from '../data/modotData';
-import { CorridorComparison } from '../types/traffic';
+import React, { useEffect, useMemo, useState } from 'react';
+import { TrendingUp, TrendingDown, Truck, Download, Info, Loader2 } from 'lucide-react';
+import { queryDb, CorridorTrend } from '../services/queryDb';
 import { downloadFile } from '../utils/exportUtils';
 
-export const TrendAnalyzer: React.FC = () => {
-  const [corridors] = useState<CorridorComparison[]>(CORRIDOR_COMPARISONS);
-  const [selectedCorridor, setSelectedCorridor] = useState<CorridorComparison>(corridors[0]);
+interface TrendAnalyzerProps { stateCode: string; stateName: string; agency: string }
 
-  const handleExportCorridorReport = () => {
-    const reportText = [
+const signed = (n: number) => `${n > 0 ? '+' : ''}${n.toLocaleString()}`;
+
+// Year-over-year change by route, computed from the built data. Needs a source with several years: states built from a native source
+// with history (Missouri, Arkansas, Delaware, Mississippi). HPMS-only states hold the latest year only and show an explanation instead.
+export const TrendAnalyzer: React.FC<TrendAnalyzerProps> = ({ stateCode, stateName, agency }) => {
+  const [years, setYears] = useState<number[] | null>(null);
+  const [base, setBase] = useState<number>(0);
+  const [compare, setCompare] = useState<number>(0);
+  const [rows, setRows] = useState<CorridorTrend[]>([]);
+  const [busy, setBusy] = useState<boolean>(false);
+  const [selected, setSelected] = useState<string>('');
+
+  useEffect(() => {
+    let alive = true; setYears(null); setRows([]);
+    queryDb.years(stateCode).then((y) => {
+      if (!alive) return;
+      setYears(y);
+      if (y.length > 1) {
+        const latest = y[y.length - 1], earlier = y.filter((v) => v < latest);
+        setCompare(latest);
+        setBase(earlier.reduce((best, v) => (Math.abs(v - 2019) < Math.abs(best - 2019) ? v : best), earlier[0])); // default baseline: the year closest to 2019
+      }
+    }).catch(() => alive && setYears([]));
+    return () => { alive = false; };
+  }, [stateCode]);
+
+  useEffect(() => {
+    if (!years || years.length < 2 || !base || !compare || base === compare) { setRows([]); return; }
+    let alive = true; setBusy(true);
+    queryDb.corridorTrends(stateCode, base, compare).then((r) => { if (alive) { setRows(r); setSelected(r[0]?.route ?? ''); } }).catch(() => alive && setRows([])).finally(() => alive && setBusy(false));
+    return () => { alive = false; };
+  }, [stateCode, years, base, compare]);
+
+  const stats = useMemo(() => {
+    if (!rows.length) return null;
+    const w = rows.reduce((a, r) => a + r.baseAadt * r.miles, 0), wc = rows.reduce((a, r) => a + r.compareAadt * r.miles, 0);
+    const tb = rows.reduce((a, r) => a + r.truckVolumeBase * r.miles, 0), tc = rows.reduce((a, r) => a + r.truckVolumeCompare * r.miles, 0);
+    const top = [...rows].filter((r) => r.miles >= 20).sort((a, b) => b.percentChange - a.percentChange)[0] ?? rows[0];
+    return { growth: w ? Math.round(((wc - w) / w) * 1000) / 10 : 0, truck: tb ? Math.round(((tc - tb) / tb) * 1000) / 10 : 0, top };
+  }, [rows]);
+  const sel = rows.find((r) => r.route === selected) ?? rows[0];
+
+  const exportReport = () => {
+    const text = [
       '==============================================================',
-      'MISSOURI DEPARTMENT OF TRANSPORTATION (MoDOT)',
-      'STATEWIDE CORRIDOR TRAFFIC VOLUME & FREIGHT TREND REPORT',
-      `GENERATED: ${new Date().toLocaleDateString()}`,
+      `${stateName.toUpperCase()} (${agency}) - ROUTE TRAFFIC VOLUME TREND`,
+      `${base} vs ${compare}, length-weighted, segments counted in both years. GENERATED: ${new Date().toLocaleDateString()}`,
       '==============================================================\n',
-      ...corridors.map((c) => (
-        `CORRIDOR: ${c.route} (${c.districtName})\n` +
-        `  Base Year (${c.baseYear}) AADT: ${c.baseAadt.toLocaleString()} vpd\n` +
-        `  Compare Year (${c.compareYear}) AADT: ${c.compareAadt.toLocaleString()} vpd\n` +
-        `  Net Volume Change: ${c.absoluteChange > 0 ? '+' : ''}${c.absoluteChange.toLocaleString()} vpd (${c.percentChange > 0 ? '+' : ''}${c.percentChange}%)\n` +
-        `  Commercial Freight Trucks: ${c.truckVolumeBase.toLocaleString()} -> ${c.truckVolumeCompare.toLocaleString()} (${c.truckPercentChange}%)\n` +
-        `  Corridor Status: ${c.status}\n` +
-        '--------------------------------------------------------------'
-      ))
+      ...rows.map((c) => `ROUTE: ${c.route} (${c.miles} mi, ${c.sections} sections)\n  ${c.baseYear} AADT: ${c.baseAadt.toLocaleString()}\n  ${c.compareYear} AADT: ${c.compareAadt.toLocaleString()}\n  Change: ${signed(c.absoluteChange)} vpd (${signed(c.percentChange)}%)\n  Status: ${c.status}\n--------------------------------------------------------------`),
     ].join('\n');
-
-    downloadFile(reportText, 'MoDOT_Corridor_Trend_Report.txt', 'text/plain');
+    downloadFile(text, `${stateCode}_Route_Trend_${base}_${compare}.txt`, 'text/plain');
   };
+
+  const header = (
+    <div className="p-5 bg-slate-900 border-b border-slate-800 flex flex-wrap items-center justify-between gap-4">
+      <div>
+        <h2 className="text-base font-bold text-slate-100 flex items-center gap-2"><TrendingUp className="w-5 h-5 text-emerald-400" />{agency} Multi-Year Traffic Trend Analyzer</h2>
+        <p className="text-xs text-slate-400 mt-1">Change in AADT by route for {stateName}, computed from the built data.</p>
+      </div>
+      {years && years.length > 1 && (
+        <div className="flex flex-wrap items-center gap-2 text-xs">
+          <label className="flex items-center gap-1.5 text-slate-400">From
+            <select value={base} onChange={(e) => setBase(+e.target.value)} className="bg-slate-950 border border-slate-800 rounded px-2 py-1 text-slate-200">{years.map((y) => <option key={y}>{y}</option>)}</select></label>
+          <label className="flex items-center gap-1.5 text-slate-400">to
+            <select value={compare} onChange={(e) => setCompare(+e.target.value)} className="bg-slate-950 border border-slate-800 rounded px-2 py-1 text-slate-200">{years.map((y) => <option key={y}>{y}</option>)}</select></label>
+          <button onClick={exportReport} disabled={!rows.length} className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white rounded font-medium"><Download className="w-3.5 h-3.5" />Export report</button>
+        </div>
+      )}
+    </div>
+  );
+
+  if (years === null) return <div className="h-full bg-slate-950 text-slate-100">{header}<p className="p-6 text-xs text-slate-400 flex items-center gap-2"><Loader2 className="w-3.5 h-3.5 animate-spin" /> Reading {stateName} data…</p></div>;
+  if (years.length < 2) return (
+    <div className="h-full bg-slate-950 text-slate-100">{header}
+      <div className="p-6 max-w-2xl text-xs text-slate-300 space-y-2">
+        <p className="flex items-start gap-2"><Info className="w-4 h-4 text-sky-400 shrink-0" />{years.length === 1 ? `${stateName}'s data holds a single year (${years[0]}).` : `No built data for ${stateName}.`} Year-over-year trends need a source with several years of counts. Missouri, Arkansas, Delaware and Mississippi have that; the other states come from FHWA's HPMS, which publishes one snapshot at a time and cannot be linked across years.</p>
+      </div>
+    </div>
+  );
 
   return (
     <div className="flex flex-col h-full bg-slate-950 text-slate-100 overflow-y-auto">
-      {/* Header Banner */}
-      <div className="p-5 bg-slate-900 border-b border-slate-800 flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h2 className="text-base font-bold text-slate-100 flex items-center gap-2">
-            <TrendingUp className="w-5 h-5 text-emerald-400" />
-            MoDOT Multi-Year Traffic Trend &amp; Freight Growth Analyzer
-          </h2>
-          <p className="text-xs text-slate-400 mt-1">
-            Comparing pre-pandemic (2019) engineering baselines against current (2024) traffic volumes across major Missouri freight and commuter corridors.
-          </p>
-        </div>
-
-        <button
-          onClick={handleExportCorridorReport}
-          className="flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-xs font-medium transition shadow-sm"
-        >
-          <Download className="w-3.5 h-3.5" />
-          <span>Export Trend Dossier</span>
-        </button>
-      </div>
-
-      {/* Main Content */}
+      {header}
       <div className="p-6 space-y-6 max-w-6xl mx-auto w-full">
-        {/* Highlight Stats */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-            <span className="text-xs text-slate-400 block">Statewide Average Growth (2019-2024)</span>
-            <span className="text-2xl font-bold font-mono text-emerald-400 mt-1 block">+5.1%</span>
-            <span className="text-[11px] text-slate-500">Above pre-pandemic baseline</span>
+        {busy && <p className="text-xs text-slate-400 flex items-center gap-2"><Loader2 className="w-3.5 h-3.5 animate-spin" /> Calculating…</p>}
+        {!busy && !rows.length && <p className="text-xs text-amber-300">No route has counts in both {base} and {compare}. Choose two other years.</p>}
+        {stats && (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-4"><span className="text-xs text-slate-400 block">Average change, top {rows.length} routes ({base}–{compare})</span>
+              <span className={`text-2xl font-bold font-mono mt-1 block ${stats.growth >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>{signed(stats.growth)}%</span><span className="text-[11px] text-slate-500">length-weighted AADT</span></div>
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-4"><span className="text-xs text-slate-400 block">Truck volume change</span>
+              <span className="text-2xl font-bold font-mono text-amber-400 mt-1 block">{signed(stats.truck)}%</span><span className="text-[11px] text-slate-500">estimated from each section's latest truck share</span></div>
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-4"><span className="text-xs text-slate-400 block">Fastest-growing route (20+ miles)</span>
+              <span className="text-xl font-bold text-slate-100 mt-1 block">{stats.top.route}</span><span className="text-[11px] text-emerald-400 font-semibold">{signed(stats.top.percentChange)}% AADT</span></div>
           </div>
-
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-            <span className="text-xs text-slate-400 block">Freight Truck Volume Growth</span>
-            <span className="text-2xl font-bold font-mono text-amber-400 mt-1 block">+8.6%</span>
-            <span className="text-[11px] text-slate-500">Driven by I-44 and I-70 logistics arteries</span>
-          </div>
-
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-            <span className="text-xs text-slate-400 block">Highest Growth Corridor</span>
-            <span className="text-xl font-bold text-slate-100 mt-1 block">I-44 Freight Artery</span>
-            <span className="text-[11px] text-emerald-400 font-semibold">+12.75% commercial truck traffic</span>
-          </div>
-        </div>
-
-        {/* Corridor Cards Grid */}
-        <div className="space-y-3">
-          <h3 className="font-bold text-sm text-slate-200">
-            Missouri Strategic Corridors Comparison Matrix
-          </h3>
-
+        )}
+        {rows.length > 0 && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {corridors.map((c) => {
-              const isSelected = selectedCorridor.route === c.route;
-              return (
-                <div
-                  key={c.route}
-                  onClick={() => setSelectedCorridor(c)}
-                  className={`bg-slate-900 border rounded-xl p-4 cursor-pointer transition space-y-3 ${
-                    isSelected ? 'border-emerald-500/70 shadow-lg' : 'border-slate-800 hover:border-slate-700'
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <h4 className="font-bold text-slate-100 text-sm">{c.route}</h4>
-                      <span className="text-xs text-slate-400">{c.districtName}</span>
-                    </div>
-                    <span className={`text-[10px] px-2 py-0.5 rounded font-medium ${
-                      c.status === 'Heavy Growth'
-                        ? 'bg-amber-950 border border-amber-800 text-amber-300'
-                        : 'bg-emerald-950 border border-emerald-800 text-emerald-300'
-                    }`}>
-                      {c.status}
-                    </span>
-                  </div>
-
-                  {/* Volume Delta Bar */}
-                  <div className="grid grid-cols-2 gap-3 pt-2 border-t border-slate-800/80 text-xs">
-                    <div>
-                      <span className="text-[11px] text-slate-500 block">2019 Baseline</span>
-                      <span className="text-base font-bold font-mono text-slate-300">
-                        {c.baseAadt.toLocaleString()}
-                      </span>
-                    </div>
-
-                    <div className="text-right">
-                      <span className="text-[11px] text-slate-500 block">2024 Current</span>
-                      <div className="flex items-center justify-end gap-1.5">
-                        <span className="text-base font-bold font-mono text-emerald-400">
-                          {c.compareAadt.toLocaleString()}
-                        </span>
-                        <span className="text-xs text-emerald-400 font-mono">
-                          (+{c.percentChange}%)
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Commercial Freight Metric */}
-                  <div className="bg-slate-950 rounded-lg p-2.5 flex items-center justify-between text-xs border border-slate-800/80">
-                    <span className="text-slate-400 flex items-center gap-1.5">
-                      <Truck className="w-3.5 h-3.5 text-amber-400" />
-                      Commercial Truck Volume
-                    </span>
-                    <span className="font-mono font-bold text-amber-400">
-                      +{c.truckPercentChange}% ({c.truckVolumeBase.toLocaleString()} → {c.truckVolumeCompare.toLocaleString()}/day)
-                    </span>
-                  </div>
+            {rows.map((c) => (
+              <div key={c.route} onClick={() => setSelected(c.route)} className={`bg-slate-900 border rounded-xl p-4 cursor-pointer transition space-y-3 ${sel?.route === c.route ? 'border-emerald-500/70 shadow-lg' : 'border-slate-800 hover:border-slate-700'}`}>
+                <div className="flex items-start justify-between gap-2">
+                  <div><h4 className="font-bold text-slate-100 text-sm">{c.route}</h4><span className="text-xs text-slate-400">{c.miles} mi · {c.sections.toLocaleString()} sections</span></div>
+                  <span className={`text-[10px] px-2 py-0.5 rounded font-medium border ${c.status === 'Heavy Growth' ? 'bg-amber-950 border-amber-800 text-amber-300' : c.status === 'Decline' ? 'bg-red-950 border-red-800 text-red-300' : 'bg-emerald-950 border-emerald-800 text-emerald-300'}`}>{c.status}</span>
                 </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Selected Corridor In-Depth Engineering Overview */}
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-4">
-          <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-            <div>
-              <span className="text-[11px] text-slate-500 uppercase tracking-wider font-mono">
-                Detailed Corridor Engineering Profile
-              </span>
-              <h3 className="text-base font-bold text-slate-100 mt-0.5">
-                {selectedCorridor.route}
-              </h3>
+                <div className="grid grid-cols-2 gap-3 pt-2 border-t border-slate-800/80 text-xs">
+                  <div><span className="text-[11px] text-slate-500 block">{c.baseYear}</span><span className="text-base font-bold font-mono text-slate-300">{c.baseAadt.toLocaleString()}</span></div>
+                  <div className="text-right"><span className="text-[11px] text-slate-500 block">{c.compareYear}</span>
+                    <div className="flex items-center justify-end gap-1.5"><span className="text-base font-bold font-mono text-emerald-400">{c.compareAadt.toLocaleString()}</span>
+                      <span className={`text-xs font-mono flex items-center gap-0.5 ${c.percentChange >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>{c.percentChange >= 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}{signed(c.percentChange)}%</span></div></div>
+                </div>
+                {c.truckVolumeCompare > 0 && (
+                  <div className="bg-slate-950 rounded-lg p-2.5 flex items-center justify-between text-xs border border-slate-800/80">
+                    <span className="text-slate-400 flex items-center gap-1.5"><Truck className="w-3.5 h-3.5 text-amber-400" />Truck volume (est.)</span>
+                    <span className="font-mono font-bold text-amber-400">{c.truckVolumeBase.toLocaleString()} → {c.truckVolumeCompare.toLocaleString()}/day</span>
+                  </div>)}
+              </div>))}
+          </div>)}
+        {sel && (
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 text-xs space-y-3">
+            <h3 className="text-base font-bold text-slate-100">{sel.route}</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div><span className="text-slate-400 block">Net daily change</span><span className="text-lg font-bold font-mono text-emerald-400">{signed(sel.absoluteChange)} vpd</span></div>
+              <div><span className="text-slate-400 block">Length counted in both years</span><span className="text-lg font-bold font-mono text-slate-200">{sel.miles} mi</span></div>
+              <div><span className="text-slate-400 block">Sections</span><span className="text-lg font-bold font-mono text-slate-200">{sel.sections.toLocaleString()}</span></div>
             </div>
-            <span className="text-xs bg-slate-800 border border-slate-700 px-2.5 py-1 rounded text-slate-200">
-              MoDOT Planning &amp; Programming Division
-            </span>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
-            <div className="space-y-1">
-              <span className="text-slate-400 block">Net Daily Volume Growth</span>
-              <span className="text-lg font-bold font-mono text-emerald-400">
-                +{selectedCorridor.absoluteChange.toLocaleString()} vpd
-              </span>
-              <p className="text-[11px] text-slate-500">
-                Additional vehicles traversing this segment daily compared to 2019.
-              </p>
-            </div>
-
-            <div className="space-y-1">
-              <span className="text-slate-400 block">Freight Volume Expansion</span>
-              <span className="text-lg font-bold font-mono text-amber-400">
-                +{selectedCorridor.truckPercentChange}%
-              </span>
-              <p className="text-[11px] text-slate-500">
-                Heavy multi-unit commercial trucks (Class 9-13).
-              </p>
-            </div>
-
-            <div className="space-y-1">
-              <span className="text-slate-400 block">Capacity Assessment</span>
-              <span className="text-lg font-bold text-slate-200">
-                {selectedCorridor.route.includes('I-70') ? 'Widening to 6 Lanes Underway' : 'Adequate Corridor LOS'}
-              </span>
-              <p className="text-[11px] text-slate-500">
-                MoDOT STIP (Statewide Transportation Improvement Program) priority.
-              </p>
-            </div>
-          </div>
-        </div>
+            <p className="text-[11px] text-slate-500">Only sections with a count in both {sel.baseYear} and {sel.compareYear} are used, weighted by length. Segment boundaries changed over the years, so a route's change reflects the sections that exist in both.</p>
+          </div>)}
       </div>
     </div>
   );

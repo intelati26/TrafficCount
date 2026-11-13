@@ -32,6 +32,8 @@ interface NaturalCorridorDrawerProps {
   onUpdateSelection: (segments: TrafficSegment[]) => void;
   onClose: () => void;
   onRefreshData: () => void;
+  /** Opens the segment inspector (history, crashes, lanes, attributes) for one segment. */
+  onInspect?: (segment: TrafficSegment) => void;
 }
 
 export const NaturalCorridorDrawer: React.FC<NaturalCorridorDrawerProps> = ({
@@ -40,7 +42,8 @@ export const NaturalCorridorDrawer: React.FC<NaturalCorridorDrawerProps> = ({
   stateCode,
   onUpdateSelection,
   onClose,
-  onRefreshData
+  onRefreshData,
+  onInspect
 }) => {
   const [isSavedLocally, setIsSavedLocally] = useState<boolean>(false);
 
@@ -202,6 +205,15 @@ export const NaturalCorridorDrawer: React.FC<NaturalCorridorDrawerProps> = ({
               <span className="font-bold text-slate-200">{s.route}</span>
               <span className="text-slate-400">({s.county} Co.)</span>
               <span className="font-mono text-emerald-400 font-semibold">{s.aadtCurrent.toLocaleString()}</span>
+              {onInspect && (
+                <button
+                  onClick={() => onInspect(s)}
+                  className="px-1.5 py-0.5 rounded bg-sky-900/60 hover:bg-sky-800 border border-sky-800 text-sky-200 text-[10px] font-medium"
+                  title="Open this segment: every year, crashes, lanes, attributes"
+                >
+                  Details
+                </button>
+              )}
               {selectedSegments.length > 1 && (
                 <button
                   onClick={() => handleRemoveSegment(s.id)}

@@ -1,4 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { openDocument, saveDocument } from '../utils/saveDocument';
+import { downloadFile, exportDocumentsToCSV } from '../utils/exportUtils';
 import { 
   FileText, 
   Download, 
@@ -27,11 +29,13 @@ import { trafficDb } from '../services/db';
 
 interface DocumentArchiveViewerProps {
   documents: MoDOTMapDocument[];
+  agency?: string;
   onDocumentUpdated: () => void;
 }
 
 export const DocumentArchiveViewer: React.FC<DocumentArchiveViewerProps> = ({
   documents,
+  agency = 'DOT',
   onDocumentUpdated
 }) => {
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -48,6 +52,7 @@ export const DocumentArchiveViewer: React.FC<DocumentArchiveViewerProps> = ({
   const [measurePoints, setMeasurePoints] = useState<{ x: number; y: number }[]>([]);
   const [measuredDistance, setMeasuredDistance] = useState<number | null>(null);
 
+  const [saveNote, setSaveNote] = useState<string>('');
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const viewerContainerRef = useRef<HTMLDivElement>(null);
 
@@ -246,7 +251,7 @@ export const DocumentArchiveViewer: React.FC<DocumentArchiveViewerProps> = ({
     ctx.strokeRect(tbX + 10, tbY + 158, tbW - 20, 16);
     ctx.font = 'bold 9px monospace';
     ctx.fillStyle = '#10b981';
-    ctx.fillText('OFFICIAL MoDOT CARTOGRAPHIC SPECIFICATION', tbX + 22, tbY + 170);
+    ctx.fillText(`OFFICIAL ${agency.toUpperCase()} CARTOGRAPHIC SPECIFICATION`, tbX + 22, tbY + 170);
 
     // Legend Block (Bottom Left)
     const legX = 40;
@@ -317,10 +322,18 @@ export const DocumentArchiveViewer: React.FC<DocumentArchiveViewerProps> = ({
         <div className="p-3 border-b border-slate-800 space-y-2">
           <div className="flex items-center justify-between">
             <span className="font-semibold text-xs tracking-wider uppercase text-slate-400">
-              Official MoDOT Map Catalog
+              Official {agency} Map Catalog
             </span>
-            <span className="text-[11px] text-emerald-400 font-mono">
+            <span className="flex items-center gap-2 text-[11px] text-emerald-400 font-mono">
               {filteredDocs.length} Documents
+              <button
+                onClick={() => downloadFile(exportDocumentsToCSV(filteredDocs), `documents_${filteredDocs[0]?.stateCode ?? 'all'}.csv`, 'text/csv')}
+                disabled={!filteredDocs.length}
+                title="Export the filtered list (titles, years, official URLs) as CSV for batch downloading"
+                className="px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-slate-300 border border-slate-700 font-sans"
+              >
+                CSV
+              </button>
             </span>
           </div>
 
@@ -412,29 +425,24 @@ export const DocumentArchiveViewer: React.FC<DocumentArchiveViewerProps> = ({
                     <span>{doc.districtName || 'Statewide'}</span>
                   </div>
 
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleToggleArchive(doc);
-                    }}
-                    className={`flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium transition ${
-                      doc.archivedLocally
-                        ? 'bg-emerald-950 text-emerald-400 border border-emerald-800'
-                        : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700'
-                    }`}
-                  >
-                    {doc.archivedLocally ? (
-                      <>
-                        <CheckCircle2 className="w-3 h-3 text-emerald-400" />
-                        <span>Archived</span>
-                      </>
-                    ) : (
-                      <>
-                        <HardDrive className="w-3 h-3" />
-                        <span>Archive</span>
-                      </>
-                    )}
-                  </button>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); openDocument(doc); }}
+                      title="Open the official file in a new tab"
+                      className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition"
+                    >
+                      <ExternalLink className="w-3 h-3" />
+                      <span>Open</span>
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); saveDocument(doc); }}
+                      title="Save the file to disk for off-app viewing"
+                      className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition"
+                    >
+                      <Download className="w-3 h-3" />
+                      <span>Save</span>
+                    </button>
+                  </div>
                 </div>
               </div>
             );
@@ -453,7 +461,7 @@ export const DocumentArchiveViewer: React.FC<DocumentArchiveViewerProps> = ({
                 {activeDocument.title}
               </span>
               <span className="text-[10px] text-slate-400">
-                MoDOT Archival Document ID: <strong className="font-mono text-slate-300">{activeDocument.id}</strong> · {activeDocument.format} ({activeDocument.fileSizeMb} MB)
+                {agency} Archival Document ID: <strong className="font-mono text-slate-300">{activeDocument.id}</strong> · {activeDocument.format} ({activeDocument.fileSizeMb} MB)
               </span>
             </div>
           </div>
@@ -531,30 +539,29 @@ export const DocumentArchiveViewer: React.FC<DocumentArchiveViewerProps> = ({
               </button>
             </div>
 
-            {/* Archive to Local DB */}
+            {/* Save to disk (never stored in the app database) */}
             <button
-              onClick={() => handleToggleArchive(activeDocument)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded font-medium text-xs transition shadow-sm ${
-                activeDocument.archivedLocally
-                  ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
-                  : 'bg-emerald-950 hover:bg-emerald-900 border border-emerald-700 text-emerald-300'
-              }`}
+              onClick={async () => {
+                const r = await saveDocument(activeDocument);
+                setSaveNote(r === 'saved' ? 'Saved to disk' : r === 'opened' ? 'Host blocked direct save; opened the official link instead' : '');
+                setTimeout(() => setSaveNote(''), 4000);
+              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded font-medium text-xs transition shadow-sm bg-emerald-950 hover:bg-emerald-900 border border-emerald-700 text-emerald-300"
+              title="Save the official file to disk for off-app viewing"
             >
-              <HardDrive className="w-3.5 h-3.5" />
-              <span>{activeDocument.archivedLocally ? 'Saved in Local DB' : 'Save to Offline DB'}</span>
+              <Download className="w-3.5 h-3.5" />
+              <span>Save to disk</span>
             </button>
 
-            {/* Official MoDOT Download Link */}
-            <a
-              href={activeDocument.officialUrl}
-              target="_blank"
-              rel="noopener noreferrer"
+            <button
+              onClick={() => openDocument(activeDocument)}
               className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded text-xs transition"
-              title="Download official PDF directly from modot.org"
+              title={`Open the official file from ${activeDocument.agencyAcronym ?? 'the agency'}`}
             >
               <ExternalLink className="w-3.5 h-3.5 text-slate-400" />
-              <span>Official MoDOT PDF</span>
-            </a>
+              <span>Open official file</span>
+            </button>
+            {saveNote && <span className="text-[11px] text-amber-300">{saveNote}</span>}
           </div>
         </div>
 
@@ -599,7 +606,7 @@ export const DocumentArchiveViewer: React.FC<DocumentArchiveViewerProps> = ({
         {/* Footer Metadata & Checksum Ribbon */}
         <div className="px-4 py-2 bg-slate-950 border-t border-slate-800 text-[11px] text-slate-400 flex flex-wrap items-center justify-between gap-4 font-mono">
           <div className="flex items-center gap-4">
-            <span>Official MoDOT Server: <strong className="text-slate-300">www.modot.org</strong></span>
+            <span>Official server: <strong className="text-slate-300">{(() => { try { return new URL(activeDocument.officialUrl).hostname; } catch { return agency; } })()}</strong></span>
             <span>·</span>
             <span>Coverage: <strong className="text-slate-300">{activeDocument.coverageArea}</strong></span>
           </div>
