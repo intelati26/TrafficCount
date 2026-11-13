@@ -76,6 +76,13 @@ export interface TrafficSegment {
   aadt2018: number;
   /** Every year available from the source (Parquet builds can hold 20+ years). Keys are years. */
   aadtHistory?: Record<number, number>;
+  /** Latest-year core statistics kept in the main data file (lanes, shoulders, crashes, trucks...), keyed by source field name. */
+  core?: Record<string, string | number>;
+  /** Whether aadt is a two-way total or per direction; ramp/connector sections are flagged because their value is often copied from the mainline. */
+  aadtBasis?: string;
+  aadtFlag?: string | null;
+  segKey?: string;
+  countYear?: number;
   
   // Commercial & Classification metrics
   commercialAadt: number;

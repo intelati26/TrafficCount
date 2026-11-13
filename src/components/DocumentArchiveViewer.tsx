@@ -29,11 +29,13 @@ import { trafficDb } from '../services/db';
 
 interface DocumentArchiveViewerProps {
   documents: MoDOTMapDocument[];
+  agency?: string;
   onDocumentUpdated: () => void;
 }
 
 export const DocumentArchiveViewer: React.FC<DocumentArchiveViewerProps> = ({
   documents,
+  agency = 'DOT',
   onDocumentUpdated
 }) => {
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -249,7 +251,7 @@ export const DocumentArchiveViewer: React.FC<DocumentArchiveViewerProps> = ({
     ctx.strokeRect(tbX + 10, tbY + 158, tbW - 20, 16);
     ctx.font = 'bold 9px monospace';
     ctx.fillStyle = '#10b981';
-    ctx.fillText('OFFICIAL MoDOT CARTOGRAPHIC SPECIFICATION', tbX + 22, tbY + 170);
+    ctx.fillText(`OFFICIAL ${agency.toUpperCase()} CARTOGRAPHIC SPECIFICATION`, tbX + 22, tbY + 170);
 
     // Legend Block (Bottom Left)
     const legX = 40;
@@ -320,7 +322,7 @@ export const DocumentArchiveViewer: React.FC<DocumentArchiveViewerProps> = ({
         <div className="p-3 border-b border-slate-800 space-y-2">
           <div className="flex items-center justify-between">
             <span className="font-semibold text-xs tracking-wider uppercase text-slate-400">
-              Official MoDOT Map Catalog
+              Official {agency} Map Catalog
             </span>
             <span className="flex items-center gap-2 text-[11px] text-emerald-400 font-mono">
               {filteredDocs.length} Documents
@@ -459,7 +461,7 @@ export const DocumentArchiveViewer: React.FC<DocumentArchiveViewerProps> = ({
                 {activeDocument.title}
               </span>
               <span className="text-[10px] text-slate-400">
-                MoDOT Archival Document ID: <strong className="font-mono text-slate-300">{activeDocument.id}</strong> · {activeDocument.format} ({activeDocument.fileSizeMb} MB)
+                {agency} Archival Document ID: <strong className="font-mono text-slate-300">{activeDocument.id}</strong> · {activeDocument.format} ({activeDocument.fileSizeMb} MB)
               </span>
             </div>
           </div>
@@ -604,7 +606,7 @@ export const DocumentArchiveViewer: React.FC<DocumentArchiveViewerProps> = ({
         {/* Footer Metadata & Checksum Ribbon */}
         <div className="px-4 py-2 bg-slate-950 border-t border-slate-800 text-[11px] text-slate-400 flex flex-wrap items-center justify-between gap-4 font-mono">
           <div className="flex items-center gap-4">
-            <span>Official MoDOT Server: <strong className="text-slate-300">www.modot.org</strong></span>
+            <span>Official server: <strong className="text-slate-300">{(() => { try { return new URL(activeDocument.officialUrl).hostname; } catch { return agency; } })()}</strong></span>
             <span>·</span>
             <span>Coverage: <strong className="text-slate-300">{activeDocument.coverageArea}</strong></span>
           </div>

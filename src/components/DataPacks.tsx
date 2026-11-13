@@ -1,12 +1,13 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { DownloadCloud, FolderDown, CheckCircle2, AlertCircle, Loader2, X } from 'lucide-react';
 import { queryDb, ManifestFile } from '../services/queryDb';
+import { importFiles, removeLocalState, localSupported } from '../services/localData';
 
 // Download built states to disk for off-app use or to copy to another device. Files are streamed straight to a chosen folder
 // (File System Access API) so a 70 MB state never sits in memory; browsers without it fall back to one download per file.
 // Tiers: seg + hist (traffic, crashes, lanes, direction) go to every build; attr (every other source field) is desktop only.
 
-interface StatePack { state: string; seg?: ManifestFile; hist?: ManifestFile; attr?: ManifestFile; built: boolean }
+interface StatePack { state: string; seg?: ManifestFile; hist?: ManifestFile; attr?: ManifestFile; built: boolean; local?: boolean }
 const mb = (b: number) => (b >= 1e9 ? (b / 1e9).toFixed(2) + ' GB' : (b / 1e6).toFixed(b < 1e7 ? 1 : 0) + ' MB');
 const isDesktop = () => typeof window !== 'undefined' && window.matchMedia?.('(pointer: fine) and (min-width: 1024px)').matches;
 const hasFolderPicker = () => typeof window !== 'undefined' && 'showDirectoryPicker' in window;
@@ -19,6 +20,8 @@ export const DataPacks: React.FC = () => {
   const [progress, setProgress] = useState<{ done: number; total: number; current: string }>({ done: 0, total: 0, current: '' });
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
   const abort = useRef<AbortController | null>(null);
+  const importRef = useRef<HTMLInputElement>(null);
+  const [importing, setImporting] = useState<{ done: number; total: number; name: string } | null>(null);
   const desktop = isDesktop();
 
   useEffect(() => { queryDb.manifestFiles().then(setFiles).catch(() => setFiles([])); }, []);
@@ -29,13 +32,31 @@ export const DataPacks: React.FC = () => {
       if (f.kind !== 'seg' && f.kind !== 'hist' && f.kind !== 'attr') continue;
       const p = by.get(f.state) ?? { state: f.state, built: false };
       (p as any)[f.kind] = f;
-      if (f.kind === 'seg') p.built = !!f.source; // no source = bundled sample data, nothing worth downloading
+      if (f.kind === 'seg') { p.built = !!f.source; p.local = !!f.local; } // no source = bundled sample data, nothing worth downloading
       by.set(f.state, p);
     }
     return [...by.values()].sort((a, b) => Number(b.built) - Number(a.built) || a.state.localeCompare(b.state));
   }, [files]);
 
-  const chosen = packs.filter(p => picked.has(p.state));
+  const localPacks = packs.filter(p => p.local);
+  const doImport = async (list: FileList | null) => {
+    if (!list?.length) return;
+    setMsg(null); setImporting({ done: 0, total: 1, name: '' });
+    try {
+      const r = await importFiles([...list], (done, total, name) => setImporting({ done, total, name }));
+      await queryDb.reload();
+      setFiles(await queryDb.manifestFiles());
+      setMsg({ text: `Imported ${r.imported.length} file(s)${r.skipped.length ? `; skipped ${r.skipped.length} (names must look like seg_AR.parquet)` : ''}. Reloading so the app picks them up…`, ok: r.imported.length > 0 });
+      if (r.imported.length) setTimeout(() => window.location.reload(), 1500);
+    } catch (e: any) { setMsg({ text: e?.message ?? 'Import failed.', ok: false }); }
+    finally { setImporting(null); if (importRef.current) importRef.current.value = ''; }
+  };
+  const removeLocal = async (state: string) => {
+    if (!window.confirm(`Remove the ${state} data stored on this device?`)) return;
+    await removeLocalState(state); await queryDb.reload(); setFiles(await queryDb.manifestFiles()); setMsg({ text: `Removed ${state} from this device.`, ok: true });
+  };
+
+  const chosen = packs.filter(p => picked.has(p.state) && !p.local);
   const listFor = (p: StatePack) => [p.seg, p.hist, withAttr && desktop ? p.attr : undefined].filter(Boolean) as ManifestFile[];
   const totalBytes = chosen.reduce((a, p) => a + listFor(p).reduce((x, f) => x + f.bytes, 0), 0);
   const toggle = (s: string) => setPicked(prev => { const n = new Set(prev); n.has(s) ? n.delete(s) : n.add(s); return n; });
@@ -90,6 +111,22 @@ export const DataPacks: React.FC = () => {
         <p className="text-xs text-slate-400 mt-1">Save built states to disk for off-app use or to copy to another device. Core files (traffic, crashes, lanes, direction, per-year history) are in every pack; the full attribute files (pavement, curves, grades, planning and the rest) are desktop only.</p>
       </div>
 
+      {localSupported() && (
+        <div className="border border-slate-800 rounded-lg p-3 space-y-2 bg-slate-900/60">
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="font-semibold text-xs">On this device</span>
+            <input ref={importRef} type="file" multiple accept=".parquet,.json,application/json" className="hidden" onChange={(e) => doImport(e.target.files)} />
+            <button onClick={() => importRef.current?.click()} disabled={!!importing} className="px-3 py-1.5 rounded bg-sky-700 hover:bg-sky-600 disabled:opacity-40 text-xs font-medium">Import data pack…</button>
+            <span className="text-[11px] text-slate-400">Choose the files a Data Pack saved (seg_XX.parquet, hist_XX.parquet … and manifest.json). They are kept on this device and read in place.</span>
+          </div>
+          {importing && (<div className="space-y-1"><div className="h-2 bg-slate-800 rounded overflow-hidden"><div className="h-full bg-sky-500" style={{ width: Math.min(100, Math.round((100 * importing.done) / Math.max(importing.total, 1))) + '%' }} /></div><p className="text-[11px] text-slate-400">{importing.name} · {mb(importing.done)} of {mb(importing.total)}</p></div>)}
+          {localPacks.length > 0 && (
+            <div className="flex flex-wrap gap-2 text-[11px]">
+              {localPacks.map(p => (<span key={p.state} className="flex items-center gap-1.5 px-2 py-1 rounded bg-slate-800 border border-slate-700">{p.state} · {mb((p.seg?.bytes ?? 0) + (p.hist?.bytes ?? 0) + (p.attr?.bytes ?? 0))}<button onClick={() => removeLocal(p.state)} className="text-slate-400 hover:text-red-300" title="Remove from this device">✕</button></span>))}
+            </div>)}
+        </div>
+      )}
+
       {files === null && <p className="text-xs text-slate-400 flex items-center gap-2"><Loader2 className="w-3.5 h-3.5 animate-spin" /> Reading manifest…</p>}
       {files !== null && !packs.length && <p className="text-xs text-amber-300">No built data found in /data/q/. Build states with scripts/build-data.ts first.</p>}
 
@@ -121,13 +158,13 @@ export const DataPacks: React.FC = () => {
               <tbody className="divide-y divide-slate-800">
                 {packs.map(p => (
                   <tr key={p.state} className={p.built ? 'hover:bg-slate-900/70' : 'opacity-50'}>
-                    <td className="p-2"><input type="checkbox" disabled={!p.built || busy} checked={picked.has(p.state)} onChange={() => toggle(p.state)} /></td>
+                    <td className="p-2"><input type="checkbox" disabled={!p.built || busy || p.local} checked={picked.has(p.state)} onChange={() => toggle(p.state)} title={p.local ? 'Stored on this device' : ''} /></td>
                     <td className="p-2 font-semibold">{p.state}</td>
                     <td className="p-2 text-right font-mono">{p.seg ? p.seg.rows.toLocaleString() : '-'}</td>
                     <td className="p-2 text-right font-mono">{p.seg ? mb(p.seg.bytes) : '-'}</td>
                     <td className="p-2 text-right font-mono">{p.hist ? mb(p.hist.bytes) : '-'}</td>
                     <td className="p-2 text-right font-mono">{p.attr ? mb(p.attr.bytes) : '-'}</td>
-                    <td className="p-2 text-slate-400 truncate max-w-[16rem]">{p.built ? (p.seg?.source ?? '').replace(/^https?:\/\//, '') : 'bundled sample data (not downloadable)'}</td>
+                    <td className="p-2 text-slate-400 truncate max-w-[16rem]">{p.local ? 'on this device' : p.built ? (p.seg?.source ?? '').replace(/^https?:\/\//, '') : 'bundled sample data (not downloadable)'}</td>
                   </tr>))}
               </tbody>
             </table>

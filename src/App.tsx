@@ -1,4 +1,5 @@
 import { queryDb } from './services/queryDb';
+import { STATE_META } from './data/stateMeta';
 import type { MapViewport } from './components/GisMapViewer';
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Header, ActiveView } from './components/Header';
@@ -94,11 +95,37 @@ export default function App() {
       : v.zoom < 2.5 ? ['Interstate', 'Freeway & Expressway', 'Other Principal Arterial']
       : v.zoom < 3.5 ? ['Interstate', 'Freeway & Expressway', 'Other Principal Arterial', 'Minor Arterial', 'Major Collector'] : undefined;
     try {
-      const segs = await queryDb.segments(activeStateCode, { bbox: v.bbox, classes, lowRes: v.zoom < 2.5, limit: v.zoom >= 3.5 ? 30000 : 8000, recentOnly: !v.historical });
+      const segs = await queryDb.segments(activeStateCode, { bbox: v.bbox, classes, lowRes: v.zoom < 2.5, limit: v.zoom >= 3.5 ? 30000 : v.zoom >= 1.3 ? 20000 : 30000, recentOnly: !v.historical, mainlineOnly: v.zoom < 2.5, sample: v.zoom < 2.5 });
       if (id === viewportReq.current) setMapSegments(segs);
     } catch (e) { console.warn('Viewport query failed:', e); }
   }, [activeStateCode]);
   useEffect(() => { setMapSegments(null); viewportReq.current++; }, [activeStateCode]);
+
+  // Every state with built data can be opened: states without a hand-written config get a basic one (bounds from the data itself).
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const built = await queryDb.states();
+      for (const code of built) {
+        if (cancelled) return;
+        const meta = STATE_META[code];
+        if (!meta || availableStates[code]) continue;
+        const b = await queryDb.bounds(code);
+        if (!b || cancelled) continue;
+        const padX = (b.maxLng - b.minLng) * 0.02, padY = (b.maxLat - b.minLat) * 0.02;
+        const bounds = { minLng: b.minLng - padX, maxLng: b.maxLng + padX, minLat: b.minLat - padY, maxLat: b.maxLat + padY };
+        const cfg: StateConfig = {
+          code, name: meta.name, agencyName: meta.agency, agencyAcronym: meta.acronym, websiteUrl: '',
+          portalName: `${meta.acronym} traffic data (built locally)`, bounds,
+          borderPoints: [[bounds.minLng, bounds.minLat], [bounds.maxLng, bounds.minLat], [bounds.maxLng, bounds.maxLat], [bounds.minLng, bounds.maxLat], [bounds.minLng, bounds.minLat]],
+          districts: [], keyCorridors: [], majorCities: [],
+        };
+        setAvailableStates((prev) => (prev[code] ? prev : { ...prev, [code]: cfg }));
+      }
+    })().catch((e) => console.warn('Could not add built states:', e));
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Overlay user-built Parquet data (public/data/q) for the active state, if present; otherwise keep bundled samples.
   useEffect(() => {
@@ -203,6 +230,7 @@ export default function App() {
         {activeView === 'documents' && (
           <DocumentArchiveViewer
             documents={filteredDocuments}
+            agency={activeStateConfig.agencyAcronym}
             onDocumentUpdated={refreshData}
           />
         )}
@@ -210,6 +238,8 @@ export default function App() {
         {activeView === 'database_grid' && (
           <DataGridTable
             segments={filteredSegments}
+            stateCode={activeStateCode}
+            stateLabel={activeStateConfig.agencyAcronym}
             onSelectSegment={(seg) => {
               handleSelectSegment(seg, false);
               setIsInspectorOpen(true);
@@ -220,14 +250,16 @@ export default function App() {
 
         {activeView === 'telemetry' && (
           <ContinuousCountStationView
-            stations={filteredStations.length > 0 ? filteredStations : stations}
+            stations={filteredStations}
+            agency={activeStateConfig.agencyAcronym}
+            stateName={activeStateConfig.name}
             selectedStation={selectedStation}
             onSelectStation={(sta) => setSelectedStation(sta)}
           />
         )}
 
         {activeView === 'trends' && (
-          <TrendAnalyzer />
+          <TrendAnalyzer stateCode={activeStateCode} stateName={activeStateConfig.name} agency={activeStateConfig.agencyAcronym} />
         )}
 
         {activeView === 'data_packs' && <DataPacks />}
@@ -247,6 +279,7 @@ export default function App() {
             onUpdateSelection={(newSegs) => setSelectedSegments(newSegs)}
             onClose={() => setSelectedSegments([])}
             onRefreshData={refreshData}
+            onInspect={(seg) => { setSelectedSegments([seg]); setIsInspectorOpen(true); }}
           />
         )}
       </main>
@@ -264,6 +297,7 @@ export default function App() {
       {isBatchArchiverOpen && (
         <BatchArchiverModal
           documents={filteredDocuments}
+          agency={activeStateConfig.agencyAcronym}
           onClose={() => setIsBatchArchiverOpen(false)}
           onRefresh={refreshData}
         />

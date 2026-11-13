@@ -13,12 +13,14 @@ import { trafficDb } from '../services/db';
 
 interface BatchArchiverModalProps {
   documents: MoDOTMapDocument[];
+  agency?: string;
   onClose: () => void;
   onRefresh: () => void;
 }
 
 export const BatchArchiverModal: React.FC<BatchArchiverModalProps> = ({
   documents,
+  agency = 'DOT',
   onClose,
   onRefresh
 }) => {
@@ -88,10 +90,10 @@ export const BatchArchiverModal: React.FC<BatchArchiverModalProps> = ({
             <DownloadCloud className="w-5 h-5 text-emerald-400" />
             <div>
               <h3 className="font-bold text-slate-100 text-sm">
-                MoDOT Batch Document Archiver
+                {agency} Batch Document Archiver
               </h3>
               <p className="text-[11px] text-slate-400">
-                Download and index official MoDOT map packages into your local offline database
+                Download and index official {agency} map packages into your local offline database
               </p>
             </div>
           </div>

@@ -21,12 +21,16 @@ import {
 import { TrafficSegment, MoDOTDistrictId } from '../types/traffic';
 import { MODOT_DISTRICTS } from '../data/modotData';
 import { trafficDb, CustomCountRecord } from '../services/db';
+import { queryDb } from '../services/queryDb';
 import { exportSegmentsToCSV, exportSegmentsToGeoJSON, downloadFile } from '../utils/exportUtils';
 
 interface DataGridTableProps {
   segments: TrafficSegment[];
   onSelectSegment: (segment: TrafficSegment) => void;
   onRefreshData: () => void;
+  /** When the state has built data, search/sort/paging run over ALL of it in SQL instead of the in-memory subset. */
+  stateCode?: string;
+  stateLabel?: string;
 }
 
 type SortField = 'route' | 'county' | 'districtId' | 'aadtCurrent' | 'aadt2023' | 'commercialAadt' | 'commercialPercent' | 'peakHourVolume' | 'lanes' | 'speedLimit';
@@ -34,7 +38,9 @@ type SortField = 'route' | 'county' | 'districtId' | 'aadtCurrent' | 'aadt2023' 
 export const DataGridTable: React.FC<DataGridTableProps> = ({
   segments,
   onSelectSegment,
-  onRefreshData
+  onRefreshData,
+  stateCode,
+  stateLabel
 }) => {
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedDistrict, setSelectedDistrict] = useState<string>('all');
@@ -62,6 +68,32 @@ export const DataGridTable: React.FC<DataGridTableProps> = ({
     notes: ''
   });
 
+  // Whole-state mode: the in-memory list is only the busiest 20,000 segments, so with built data the table queries the Parquet file directly.
+  const PAGE_SIZE = 200;
+  const [page, setPage] = useState<number>(0);
+  const [sql, setSql] = useState<{ rows: TrafficSegment[]; total: number } | null>(null);
+  const [sqlBusy, setSqlBusy] = useState<boolean>(false);
+  const [districtList, setDistrictList] = useState<{ id: string; n: number }[] | null>(null);
+  const [debounced, setDebounced] = useState<string>('');
+  useEffect(() => { const t = setTimeout(() => setDebounced(searchQuery), 250); return () => clearTimeout(t); }, [searchQuery]);
+  useEffect(() => { setPage(0); }, [stateCode, debounced, selectedDistrict, minAadt, minTruckPercent, sortField, sortDirection]);
+  useEffect(() => {
+    let alive = true; setDistrictList(null);
+    if (stateCode) queryDb.has(stateCode, 'seg').then((h) => h ? queryDb.districts(stateCode) : null).then((d) => { if (alive) setDistrictList(d); }).catch(() => {});
+    return () => { alive = false; };
+  }, [stateCode]);
+  useEffect(() => {
+    let alive = true;
+    if (!stateCode) { setSql(null); return; }
+    setSqlBusy(true);
+    queryDb.has(stateCode, 'seg').then(async (has) => {
+      if (!has) { if (alive) setSql(null); return; }
+      const r = await queryDb.grid(stateCode, { search: debounced, district: selectedDistrict, minAadt, minTruckPct: minTruckPercent, sort: sortField, dir: sortDirection, limit: PAGE_SIZE, offset: page * PAGE_SIZE, recentOnly: false });
+      if (alive) setSql(r);
+    }).catch((e) => console.warn('Grid query failed:', e)).finally(() => { if (alive) setSqlBusy(false); });
+    return () => { alive = false; };
+  }, [stateCode, debounced, selectedDistrict, minAadt, minTruckPercent, sortField, sortDirection, page]);
+
   const handleSort = (field: SortField) => {
     if (sortField === field) {
       setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
@@ -73,6 +105,7 @@ export const DataGridTable: React.FC<DataGridTableProps> = ({
 
   // Filtered & Sorted segments
   const processedSegments = useMemo(() => {
+    if (sql) return sql.rows; // already filtered, sorted and paged in SQL
     return segments
       .filter((seg) => {
         if (selectedDistrict !== 'all' && seg.districtId !== selectedDistrict) return false;
@@ -97,7 +130,7 @@ export const DataGridTable: React.FC<DataGridTableProps> = ({
         }
         return sortDirection === 'asc' ? valA - valB : valB - valA;
       });
-  }, [segments, selectedDistrict, minAadt, minTruckPercent, searchQuery, sortField, sortDirection]);
+  }, [sql, segments, selectedDistrict, minAadt, minTruckPercent, searchQuery, sortField, sortDirection]);
 
   useEffect(() => { setVisibleCount(250); }, [selectedDistrict, minAadt, minTruckPercent, searchQuery, sortField, sortDirection]);
 
@@ -125,14 +158,18 @@ export const DataGridTable: React.FC<DataGridTableProps> = ({
     onRefreshData();
   };
 
-  const handleExportCSV = () => {
-    const csv = exportSegmentsToCSV(processedSegments);
-    downloadFile(csv, `MoDOT_Traffic_Segments_${new Date().toISOString().split('T')[0]}.csv`, 'text/csv');
+  const handleExportCSV = async () => {
+    // whole-state mode exports every match (up to 100,000 rows), not just the visible page
+    const all = sql && stateCode ? (await queryDb.grid(stateCode, { search: debounced, district: selectedDistrict, minAadt, minTruckPct: minTruckPercent, sort: sortField, dir: sortDirection, limit: 100000 })).rows : processedSegments;
+    const csv = exportSegmentsToCSV(all);
+    downloadFile(csv, `Traffic_Segments_${new Date().toISOString().split('T')[0]}.csv`, 'text/csv');
   };
 
-  const handleExportGeoJSON = () => {
-    const geojson = exportSegmentsToGeoJSON(processedSegments);
-    downloadFile(geojson, `MoDOT_Traffic_Segments_${new Date().toISOString().split('T')[0]}.geojson`, 'application/json');
+  const handleExportGeoJSON = async () => {
+    // geometry is only loaded for the export, capped at 20,000 features
+    const all = sql && stateCode ? (await queryDb.grid(stateCode, { search: debounced, district: selectedDistrict, minAadt, minTruckPct: minTruckPercent, sort: sortField, dir: sortDirection, limit: 20000, withGeometry: true })).rows : processedSegments;
+    const geojson = exportSegmentsToGeoJSON(all);
+    downloadFile(geojson, `Traffic_Segments_${new Date().toISOString().split('T')[0]}.geojson`, 'application/json');
   };
 
   const handleArchiveSegment = async (seg: TrafficSegment) => {
@@ -148,10 +185,10 @@ export const DataGridTable: React.FC<DataGridTableProps> = ({
           <div className="flex items-center gap-2">
             <span className="font-bold text-sm text-slate-100 flex items-center gap-2">
               <Table className="w-4 h-4 text-emerald-400" />
-              MoDOT AADT Traffic Database &amp; Query Console
+              {stateLabel ?? 'AADT'} Traffic Database &amp; Query Console
             </span>
             <span className="text-xs bg-slate-800 border border-slate-700 px-2 py-0.5 rounded text-slate-300 font-mono">
-              {processedSegments.length} of {segments.length} Segments
+              {sql ? `${sql.total.toLocaleString()} matching segments${sqlBusy ? ' …' : ''}` : `${processedSegments.length} of ${segments.length} Segments`}
             </span>
           </div>
 
@@ -205,10 +242,10 @@ export const DataGridTable: React.FC<DataGridTableProps> = ({
               onChange={(e) => setSelectedDistrict(e.target.value)}
               className="w-full bg-slate-950 border border-slate-800 rounded px-2.5 py-1.5 text-xs text-slate-200"
             >
-              <option value="all">All MoDOT Districts</option>
-              {MODOT_DISTRICTS.map((d) => (
-                <option key={d.id} value={d.id}>{d.name} ({d.code})</option>
-              ))}
+              <option value="all">All districts</option>
+              {sql && districtList
+                ? districtList.map((d) => (<option key={d.id} value={d.id}>{d.id} ({d.n.toLocaleString()})</option>))
+                : MODOT_DISTRICTS.map((d) => (<option key={d.id} value={d.id}>{d.name} ({d.code})</option>))}
             </select>
           </div>
 
@@ -296,7 +333,7 @@ export const DataGridTable: React.FC<DataGridTableProps> = ({
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-850">
-            {processedSegments.slice(0, visibleCount).map((seg) => (
+            {(sql ? processedSegments : processedSegments.slice(0, visibleCount)).map((seg) => (
               <tr 
                 key={seg.id}
                 onClick={() => onSelectSegment(seg)}
@@ -355,7 +392,14 @@ export const DataGridTable: React.FC<DataGridTableProps> = ({
             ))}
           </tbody>
         </table>
-        {processedSegments.length > visibleCount && (
+        {sql && sql.total > PAGE_SIZE && (
+          <div className="flex items-center justify-center gap-3 py-3 text-xs text-slate-400">
+            <button disabled={page === 0 || sqlBusy} onClick={() => setPage((p) => Math.max(0, p - 1))} className="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 disabled:opacity-40 border border-slate-700 text-slate-200">Previous</button>
+            <span>{(page * PAGE_SIZE + 1).toLocaleString()}–{Math.min((page + 1) * PAGE_SIZE, sql.total).toLocaleString()} of {sql.total.toLocaleString()}</span>
+            <button disabled={(page + 1) * PAGE_SIZE >= sql.total || sqlBusy} onClick={() => setPage((p) => p + 1)} className="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 disabled:opacity-40 border border-slate-700 text-slate-200">Next</button>
+          </div>
+        )}
+        {!sql && processedSegments.length > visibleCount && (
           <div className="flex items-center justify-center gap-3 py-3 text-xs text-slate-400">
             <span>Showing {visibleCount.toLocaleString()} of {processedSegments.length.toLocaleString()}</span>
             <button onClick={() => setVisibleCount((n) => n + 500)} className="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200">Show 500 more</button>
@@ -371,7 +415,7 @@ export const DataGridTable: React.FC<DataGridTableProps> = ({
             <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-800 bg-slate-950">
               <span className="font-bold text-sm text-slate-100 flex items-center gap-2">
                 <PlusCircle className="w-4 h-4 text-emerald-400" />
-                Record Custom MoDOT Traffic Count
+                Record Custom Traffic Count
               </span>
               <button
                 onClick={() => setShowAddModal(false)}
@@ -465,7 +509,7 @@ export const DataGridTable: React.FC<DataGridTableProps> = ({
                 <label className="block text-slate-400 mb-1">Field Notes / Methodology</label>
                 <textarea
                   rows={2}
-                  placeholder="Pneumatic tube counter 48h count adjusted by MoDOT axle factor..."
+                  placeholder="Pneumatic tube counter 48h count adjusted by the agency axle factor..."
                   value={customForm.notes}
                   onChange={(e) => setCustomForm({ ...customForm, notes: e.target.value })}
                   className="w-full bg-slate-950 border border-slate-800 rounded px-2.5 py-1.5 text-slate-200"
