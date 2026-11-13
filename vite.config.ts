@@ -12,8 +12,10 @@ function androidAssets(outDir: string): Plugin {
   return {
     name: 'android-assets',
     apply: 'build',
-    closeBundle() {
+    // writeBundle runs after Vite has written (and emptied) the output folder; closeBundle could run first on a fresh checkout
+    writeBundle() {
       const out = path.resolve(__dirname, outDir), pub = path.resolve(__dirname, 'public');
+      fs.mkdirSync(out, { recursive: true });
       for (const f of fs.readdirSync(pub)) if (/\.(png|svg|ico)$/.test(f)) fs.copyFileSync(path.join(pub, f), path.join(out, f));
       const dd = path.resolve(__dirname, 'node_modules/@duckdb/duckdb-wasm/dist');
       fs.mkdirSync(path.join(out, 'duckdb'), { recursive: true });
