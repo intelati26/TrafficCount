@@ -1,0 +1,84 @@
+name: CI
+
+# Code checks on every push and pull request; a weekly source check that every state can still be rebuilt.
+# NO DATA goes to or from GitHub: built Parquet files are never committed, cached or uploaded. The scheduled job builds tiny samples
+# in a throwaway folder and uploads only the small text report.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: '17 6 * * 1'   # Mondays 06:17 UTC: source preflight
+  workflow_dispatch:
+    inputs:
+      preflight:
+        description: 'Run the source preflight (about 15-25 minutes)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  no-data-guard:
+    name: No data or large files tracked
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - run: bash scripts/check-no-data.sh
+
+  check:
+    name: Typecheck and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Install dependencies
+        run: deno install
+      - name: Typecheck
+        run: deno run -A npm:typescript/tsc --noEmit
+      - name: Build
+        run: deno run -A npm:vite build
+
+  source-preflight:
+    name: Every state is still rebuildable (sample builds)
+    if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.preflight)
+    needs: [no-data-guard, check]
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - run: deno install
+      - name: Preflight (first page of every source, validated, nothing kept)
+        run: |
+          # throwaway folder on the runner (the runner context is not available in job-level env, so use the variable here)
+          export PREFLIGHT_TMP="$RUNNER_TEMP/preflight"
+          mkdir -p "$PREFLIGHT_TMP"
+          deno run -A npm:tsx scripts/preflight.ts
+      - name: Summary
+        if: always()
+        run: |
+          if [ -f scoping/PREFLIGHT.md ]; then
+            head -n 8 scoping/PREFLIGHT.md >> "$GITHUB_STEP_SUMMARY"
+            grep -E "FAIL" scoping/PREFLIGHT.md >> "$GITHUB_STEP_SUMMARY" || echo "No failures." >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Upload the report (text only)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: preflight-report
+          path: |
+            scoping/PREFLIGHT.md
+            scoping/preflight.json
+          retention-days: 30

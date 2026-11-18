@@ -22,3 +22,13 @@
     background: #475569;
   }
 }
+
+
+/* Touch screens: controls must be easy to hit (at least ~40 px) */
+@media (pointer: coarse) {
+  button, select, summary, [role='button'] { min-height: 40px; }
+  button:has(> svg:only-child) { min-width: 40px; } /* icon-only buttons; text buttons keep their natural width so tab rows do not collapse */
+  select, input[type='text'], input[type='search'], input[type='number'] { min-height: 40px; }
+  input[type='checkbox'], input[type='radio'] { width: 22px; height: 22px; }
+  label:has(input[type='checkbox']) { min-height: 40px; }
+}

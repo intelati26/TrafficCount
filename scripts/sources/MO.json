@@ -1,0 +1,28 @@
+{
+  "state": "MO",
+  "agency": "MoDOT",
+  "service": "https://mapping.modot.mo.gov/arcgis/rest/services/BusinessInt/TrafficInfoSegAADT/MapServer",
+  "layers": [16, 17, 18, 19],
+  "yearField": "YEAR",
+  "aadtField": "AADT",
+  "idFields": ["TRF_INFO_SEG_ID", "TRAVELWAY_ID", "TRAVELWAY_DIR", "BEG_CONTINUOUS_LOG"],
+  "yearsBack": 30,
+  "aadtBasis": "directional",
+  "extra": "*",
+  "core": ["AADT", "YEAR", "PERCENT_COMMERCIAL", "SPEED_LIMIT", "FUNC_CLASS_NAME", "TRAVELWAY_DIR", "NUMBER_OF_LANES", "LANE_WIDTH", "SHOULDER_TYPE", "SHOULDER_WIDTH", "DIVIDED_UNDIVIDED", "ROADWAY_TYPE_NAME", "ROADWAY_AADT",
+           "AVG_3YR_OFF_ROAD", "AVG_3YR_FIXED_OBJ", "AVG_3YR_HEAD_ON", "AVG_3YR_SIDESWIPE", "AVG_3YR_PDO", "AVG_3YR_INJURY", "AVG_3YR_FATAL", "AVG_3YR_WET", "AVG_3YR_DRY",
+           "ACTUAL_ACC_RATE", "ACC_RATE_BY_TYPE", "AVG_ACC_RATE", "PDO_RATE", "INJURY_RATE", "FATALITY_RATE", "ACCIDENT_INDEX", "INJURY_INDEX", "FATAL_ACC_INDEX", "HIGH_HAZ_ACC_INDEX", "WET_DRY_INDEX"],
+  "fields": {
+    "desg": "TRAVELWAY_DESG", "name": "TRAVELWAY_NAME", "description": "TRF_INFO_SEG_DESC",
+    "district": "AREA_ENGINEER", "lanes": "NUMBER_OF_LANES", "speed": "SPEED_LIMIT", "fclass": "FUNC_CLASS_NAME",
+    "truckPct": "PERCENT_COMMERCIAL", "mpStart": "BEG_CONTINUOUS_LOG", "mpEnd": "END_CONTINUOUS_LOG"
+  },
+  "routePrefix": { "IS": "I-", "US": "US-", "MO": "MO-", "RT": "Route " },
+  "routeType": { "IS": "Interstate", "US": "US Highway", "MO": "State Route", "RT": "Lettered Route" },
+  "fclassMap": {
+    "INTERSTATE": "Interstate", "FREEWAY": "Freeway & Expressway", "PRINCIPAL ARTERIAL": "Other Principal Arterial",
+    "MINOR ARTERIAL": "Minor Arterial", "MAJOR COLLECTOR": "Major Collector", "MINOR COLLECTOR": "Minor Collector", "LOCAL": "Local"
+  },
+  "truckPctIsFraction": true,
+  "notes": "Directional AADT (N/S/E/W layers, Group5 = most detailed scale tier). One row per segment+direction; ROADWAY_AADT is the two-way total. Layer YEAR field spans 1999-2025."
+}

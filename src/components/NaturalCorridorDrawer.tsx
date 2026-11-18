@@ -1,3 +1,4 @@
+import { travelled, useTravelVersion } from '../services/traveled';
 import React, { useState } from 'react';
 import { 
   GitCommit, 
@@ -32,6 +33,8 @@ interface NaturalCorridorDrawerProps {
   onUpdateSelection: (segments: TrafficSegment[]) => void;
   onClose: () => void;
   onRefreshData: () => void;
+  /** Opens the segment inspector (history, crashes, lanes, attributes) for one segment. */
+  onInspect?: (segment: TrafficSegment) => void;
 }
 
 export const NaturalCorridorDrawer: React.FC<NaturalCorridorDrawerProps> = ({
@@ -40,9 +43,11 @@ export const NaturalCorridorDrawer: React.FC<NaturalCorridorDrawerProps> = ({
   stateCode,
   onUpdateSelection,
   onClose,
-  onRefreshData
+  onRefreshData,
+  onInspect
 }) => {
   const [isSavedLocally, setIsSavedLocally] = useState<boolean>(false);
+  useTravelVersion();
 
   if (selectedSegments.length === 0) return null;
 
@@ -128,6 +133,14 @@ export const NaturalCorridorDrawer: React.FC<NaturalCorridorDrawerProps> = ({
         {/* Quick Expansion Tools & Close */}
         <div className="flex items-center gap-2">
           <button
+            onClick={() => (selectedSegments.every((s) => travelled.has(s)) ? travelled.unmark(selectedSegments) : travelled.mark(selectedSegments))}
+            className="px-2.5 py-1 bg-fuchsia-900/60 hover:bg-fuchsia-800 border border-fuchsia-800 rounded text-fuchsia-100 transition text-[11px] font-medium"
+            title="Mark these segments as travelled, both directions"
+          >
+            {selectedSegments.every((s) => travelled.has(s)) ? 'Unmark travelled' : 'Mark all travelled'}
+          </button>
+
+          <button
             onClick={handleExpandSurrounding}
             className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded text-slate-200 transition text-[11px] font-medium"
             title="Auto-select adjacent adjoining segments (2 Hops)"
@@ -202,6 +215,15 @@ export const NaturalCorridorDrawer: React.FC<NaturalCorridorDrawerProps> = ({
               <span className="font-bold text-slate-200">{s.route}</span>
               <span className="text-slate-400">({s.county} Co.)</span>
               <span className="font-mono text-emerald-400 font-semibold">{s.aadtCurrent.toLocaleString()}</span>
+              {onInspect && (
+                <button
+                  onClick={() => onInspect(s)}
+                  className="px-1.5 py-0.5 rounded bg-sky-900/60 hover:bg-sky-800 border border-sky-800 text-sky-200 text-[10px] font-medium"
+                  title="Open this segment: every year, crashes, lanes, attributes"
+                >
+                  Details
+                </button>
+              )}
               {selectedSegments.length > 1 && (
                 <button
                   onClick={() => handleRemoveSegment(s.id)}

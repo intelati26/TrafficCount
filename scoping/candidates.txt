@@ -1,0 +1,10 @@
+# state-tagged candidate endpoints (from web search; unverified until probed)
+https://gis.iowadot.gov/agshost/rest/services/Systems_Planning/ICE/FeatureServer
+https://services2.arcgis.com/aIrBD8yn1TDTEXoz/ArcGIS/rest/services/ADT_COMP_2020Dissolved/FeatureServer
+https://services2.arcgis.com/CcI36Pduqd0OR4W9/ArcGIS/rest/services/Traffic_Section_Middle_Third/FeatureServer
+https://services.arcgis.com/IYrj3otxNjPsrTRD/ArcGIS/rest/services/HistoricTrafficData_3/FeatureServer
+https://gis.arkansas.gov/arcgis/rest/services/FEATURESERVICES/Transportation/FeatureServer/6
+https://services6.arcgis.com/clPWQMwZfdWn4MQZ/ArcGIS/rest/services/HPMS_2024_Data/FeatureServer
+https://services6.arcgis.com/RBtoEUQ2lmN0K3GY/ArcGIS/rest/services/AADT_Network/FeatureServer
+https://kanplan.ksdot.gov/arcgis_web_adaptor/rest/services/Transportation/AADT_Flow_Map/FeatureServer/0
+https://giscat.ne.gov/Enterprise/rest/services/AnnualAverageDailyTraffic/MapServer

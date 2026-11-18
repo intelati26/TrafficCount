@@ -19,20 +19,25 @@ interface ContinuousCountStationViewProps {
   stations: ContinuousCountStation[];
   selectedStation: ContinuousCountStation | null;
   onSelectStation: (station: ContinuousCountStation) => void;
+  agency?: string;
+  stateName?: string;
 }
 
 export const ContinuousCountStationView: React.FC<ContinuousCountStationViewProps> = ({
   stations,
   selectedStation,
-  onSelectStation
+  onSelectStation,
+  agency = 'DOT',
+  stateName = 'this state'
 }) => {
   const activeStation = selectedStation || stations[0];
   const [activeTab, setActiveTab] = useState<'hourly' | 'dayOfWeek' | 'monthly' | 'classes'>('hourly');
 
   if (!activeStation) {
     return (
-      <div className="p-8 text-center text-slate-400">
-        No Continuous Count Stations loaded.
+      <div className="p-8 max-w-xl mx-auto text-center text-slate-400 text-sm space-y-2">
+        <p className="font-medium text-slate-300">No continuous-count stations for {stateName}.</p>
+        <p className="text-xs">Station profiles (hourly, day-of-week and monthly patterns) are only available for the few states that have them in the bundled sample data. Count coverage for {stateName} is on the map and in the AADT grid.</p>
       </div>
     );
   }
@@ -59,7 +64,7 @@ export const ContinuousCountStationView: React.FC<ContinuousCountStationViewProp
 
     downloadFile(
       JSON.stringify(report, null, 2),
-      `MoDOT_${activeStation.stationNumber.replace(/[^a-zA-Z0-9]/g, '_')}_Report.json`,
+      `${agency}_${activeStation.stationNumber.replace(/[^a-zA-Z0-9]/g, '_')}_Report.json`,
       'application/json'
     );
   };
@@ -71,7 +76,7 @@ export const ContinuousCountStationView: React.FC<ContinuousCountStationViewProp
         <div className="p-3.5 border-b border-slate-800">
           <span className="font-bold text-xs uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
             <Activity className="w-3.5 h-3.5 text-emerald-400" />
-            MoDOT Telemetric ATR Stations
+            {agency} Telemetric ATR Stations
           </span>
           <p className="text-[11px] text-slate-500 mt-0.5">
             24/7/365 Automated Traffic Recorders (CCS)

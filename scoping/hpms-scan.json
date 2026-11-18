@@ -1,0 +1,796 @@
+[
+ {
+  "state": "AK",
+  "years": [
+   2020,
+   2022,
+   2023,
+   2024,
+   2025
+  ],
+  "latest": 2025,
+  "service": "https://geo.dot.gov/server/rest/services/Hosted/HPMS_FULL_AK_2025/FeatureServer/0",
+  "rows": 56584,
+  "aadtRows": 30019,
+  "fedAidRows": 56584
+ },
+ {
+  "state": "AL",
+  "years": [
+   2019,
+   2020,
+   2022,
+   2023,
+   2024,
+   2025
+  ],
+  "latest": 2025,
+  "service": "https://geo.dot.gov/server/rest/services/Hosted/HPMS_FULL_AL_2025/FeatureServer/0",
+  "rows": 357695,
+  "aadtRows": 178265,
+  "fedAidRows": 357393
+ },
+ {
+  "state": "AR",
+  "years": [
+   2020,
+   2022,
+   2023,
+   2024,
+   2025
+  ],
+  "latest": 2025,
+  "service": "https://geo.dot.gov/server/rest/services/Hosted/HPMS_FULL_AR_2025/FeatureServer/0",
+  "rows": 211709,
+  "aadtRows": 59436,
+  "fedAidRows": 211707
+ },
+ {
+  "state": "AZ",
+  "years": [
+   2020,
+   2022,
+   2023,
+   2024,
+   2025
+  ],
+  "latest": 2025,
+  "service": "https://geo.dot.gov/server/rest/services/Hosted/HPMS_FULL_AZ_2025/FeatureServer/0",
+  "rows": 472663,
+  "aadtRows": 144372,
+  "fedAidRows": 355446
+ },
+ {
+  "state": "CA",
+  "years": [
+   2019,
+   2020,
+   2022,
+   2023,
+   2024,
+   2025
+  ],
+  "latest": 2025,
+  "service": "https://geo.dot.gov/server/rest/services/Hosted/HPMS_FULL_CA_2025/FeatureServer/0",
+  "rows": 803191,
+  "aadtRows": 369460,
+  "fedAidRows": 803191
+ },
+ {
+  "state": "CO",
+  "years": [
+   2020,
+   2021,
+   2022,
+   2023,
+   2024,
+   2025
+  ],
+  "latest": 2025,
+  "service": "https://geo.dot.gov/server/rest/services/Hosted/HPMS_FULL_CO_2025/FeatureServer/0",
+  "rows": 205077,
+  "aadtRows": 91965,
+  "fedAidRows": 205077
+ },
+ {
+  "state": "CT",
+  "years": [
+   2020,
+   2022,
+   2023,
+   2024,
+   2025
+  ],
+  "latest": 2025,
+  "service": "https://geo.dot.gov/server/rest/services/Hosted/HPMS_FULL_CT_2025/FeatureServer/0",
+  "rows": 93809,
+  "aadtRows": 45491,
+  "fedAidRows": 93809
+ },
+ {
+  "state": "DC",
+  "years": [
+   2020,
+   2021,
+   2022,
+   2023,
+   2024,
+   2025
+  ],
+  "latest": 2025,
+  "service": "https://geo.dot.gov/server/rest/services/Hosted/HPMS_FULL_DC_2025/FeatureServer/0",
+  "rows": 11682,
+  "aadtRows": 8235,
+  "fedAidRows": 11682
+ },
+ {
+  "state": "DE",
+  "years": [
+   2020,
+   2021,
+   2022,
+   2023,
+   2024,
+   2025
+  ],
+  "latest": 2025,
+  "service": "https://geo.dot.gov/server/rest/services/Hosted/HPMS_FULL_DE_2025/FeatureServer/0",
+  "rows": 94749,
+  "aadtRows": 47556,
+  "fedAidRows": 94747
+ },
+ {
+  "state": "FL",
+  "years": [
+   2020,
+   2022,
+   2023,
+   2024,
+   2025
+  ],
+  "latest": 2025,
+  "service": "https://geo.dot.gov/server/rest/services/Hosted/HPMS_FULL_FL_2025/FeatureServer/0",
+  "rows": 1111085,
+  "aadtRows": 202770,
+  "fedAidRows": 809840
+ },
+ {
+  "state": "GA",
+  "years": [
+   2020,
+   2022,
+   2023,
+   2024,
+   2025
+  ],
+  "latest": 2025,
+  "service": "https://geo.dot.gov/server/rest/services/Hosted/HPMS_FULL_GA_2025/FeatureServer/0",
+  "rows": 376723,
+  "aadtRows": 148085,
+  "fedAidRows": 376138
+ },
+ {
+  "state": "HI",
+  "years": [
+   2020,
+   2022,
+   2023,
+   2024,
+   2025
+  ],
+  "latest": 2025,
+  "service": "https://geo.dot.gov/server/rest/services/Hosted/HPMS_FULL_HI_2025/FeatureServer/0",
+  "rows": 81032,
+  "aadtRows": 67303,
+  "fedAidRows": 81032
+ },
+ {
+  "state": "IA",
+  "years": [
+   2020,
+   2022,
+   2023,
+   2024,
+   2025
+  ],
+  "latest": 2025,
+  "service": "https://geo.dot.gov/server/rest/services/Hosted/HPMS_FULL_IA_2025/FeatureServer/0",
+  "rows": 412234,
+  "aadtRows": 371741,
+  "fedAidRows": 376490
+ },
+ {
+  "state": "ID",
+  "years": [
+   2020,
+   2022,
+   2023,
+   2024,
+   2025
+  ],
+  "latest": 2025,
+  "service": "https://geo.dot.gov/server/rest/services/Hosted/HPMS_FULL_ID_2025/FeatureServer/0",
+  "rows": 193728,
+  "aadtRows": 95035,
+  "fedAidRows": 182920
+ },
+ {
+  "state": "IL",
+  "years": [
+   2020,
+   2022,
+   2023,
+   2024,
+   2025
+  ],
+  "latest": 2025,
+  "service": "https://geo.dot.gov/server/rest/services/Hosted/HPMS_FULL_IL_2025/FeatureServer/0",
+  "rows": 429442,
+  "aadtRows": 171319,
+  "fedAidRows": 429442
+ },
+ {
+  "state": "IN",
+  "years": [
+   2020,
+   2022,
+   2023,
+   2024,
+   2025
+  ],
+  "latest": 2025,
+  "service": "https://geo.dot.gov/server/rest/services/Hosted/HPMS_FULL_IN_2025/FeatureServer/0",
+  "rows": 610343,
+  "aadtRows": 457898,
+  "fedAidRows": 609094
+ },
+ {
+  "state": "KS",
+  "years": [
+   2020,
+   2021,
+   2022,
+   2023,
+   2024,
+   2025
+  ],
+  "latest": 2025,
+  "service": "https://geo.dot.gov/server/rest/services/Hosted/HPMS_FULL_KS_2025/FeatureServer/0",
+  "rows": 261092,
+  "aadtRows": 112091,
+  "fedAidRows": 261067
+ },
+ {
+  "state": "KY",
+  "years": [
+   2019,
+   2020,
+   2022,
+   2023,
+   2024,
+   2025
+  ],
+  "latest": 2025,
+  "service": "https://geo.dot.gov/server/rest/services/Hosted/HPMS_FULL_KY_2025/FeatureServer/0",
+  "rows": 350555,
+  "aadtRows": 161256,
+  "fedAidRows": 350555
+ },
+ {
+  "state": "LA",
+  "years": [
+   2022,
+   2023,
+   2024,
+   2025
+  ],
+  "latest": 2025,
+  "service": "https://geo.dot.gov/server/rest/services/Hosted/HPMS_FULL_LA_2025/FeatureServer/0",
+  "rows": 379429,
+  "aadtRows": 338963,
+  "fedAidRows": 379422
+ },
+ {
+  "state": "MA",
+  "years": [
+   2020,
+   2022,
+   2023,
+   2024,
+   2025
+  ],
+  "latest": 2025,
+  "service": "https://geo.dot.gov/server/rest/services/Hosted/HPMS_FULL_MA_2025/FeatureServer/0",
+  "rows": 365817,
+  "aadtRows": 125290,
+  "fedAidRows": 352389
+ },
+ {
+  "state": "MD",
+  "years": [
+   2020,
+   2021,
+   2022,
+   2023,
+   2024,
+   2025
+  ],
+  "latest": 2025,
+  "service": "https://geo.dot.gov/server/rest/services/Hosted/HPMS_FULL_MD_2025/FeatureServer/0",
+  "rows": 150575,
+  "aadtRows": 64782,
+  "fedAidRows": 150575
+ },
+ {
+  "state": "ME",
+  "years": [
+   2020,
+   2022,
+   2023,
+   2024,
+   2025
+  ],
+  "latest": 2025,
+  "service": "https://geo.dot.gov/server/rest/services/Hosted/HPMS_FULL_ME_2025/FeatureServer/0",
+  "rows": 105936,
+  "aadtRows": 72540,
+  "fedAidRows": 105936
+ },
+ {
+  "state": "MI",
+  "years": [
+   2020,
+   2022,
+   2023,
+   2024,
+   2025
+  ],
+  "latest": 2025,
+  "service": "https://geo.dot.gov/server/rest/services/Hosted/HPMS_FULL_MI_2025/FeatureServer/0",
+  "rows": 298115,
+  "aadtRows": 129941,
+  "fedAidRows": 294367
+ },
+ {
+  "state": "MN",
+  "years": [
+   2020,
+   2022,
+   2023,
+   2024,
+   2025
+  ],
+  "latest": 2025,
+  "service": "https://geo.dot.gov/server/rest/services/Hosted/HPMS_FULL_MN_2025/FeatureServer/0",
+  "rows": 539658,
+  "aadtRows": 161358,
+  "fedAidRows": 539658
+ },
+ {
+  "state": "MO",
+  "years": [
+   2020,
+   2021,
+   2022,
+   2023,
+   2024,
+   2025
+  ],
+  "latest": 2025,
+  "service": "https://geo.dot.gov/server/rest/services/Hosted/HPMS_FULL_MO_2025/FeatureServer/0",
+  "rows": 528084,
+  "aadtRows": 320661,
+  "fedAidRows": 499032
+ },
+ {
+  "state": "MS",
+  "years": [
+   2020,
+   2022,
+   2023,
+   2024,
+   2025
+  ],
+  "latest": 2025,
+  "service": "https://geo.dot.gov/server/rest/services/Hosted/HPMS_FULL_MS_2025/FeatureServer/0",
+  "rows": 181136,
+  "aadtRows": 76430,
+  "fedAidRows": 181136
+ },
+ {
+  "state": "MT",
+  "years": [
+   2020,
+   2022,
+   2023,
+   2024,
+   2025
+  ],
+  "latest": 2025,
+  "service": "https://geo.dot.gov/server/rest/services/Hosted/HPMS_FULL_MT_2025/FeatureServer/0",
+  "rows": 129425,
+  "aadtRows": 128182,
+  "fedAidRows": 129425
+ },
+ {
+  "state": "NC",
+  "years": [
+   2020,
+   2022,
+   2023,
+   2024,
+   2025
+  ],
+  "latest": 2025,
+  "service": "https://geo.dot.gov/server/rest/services/Hosted/HPMS_FULL_NC_2025/FeatureServer/0",
+  "rows": 433266,
+  "aadtRows": 185300,
+  "fedAidRows": 433266
+ },
+ {
+  "state": "ND",
+  "years": [
+   2020,
+   2022,
+   2023,
+   2024,
+   2025
+  ],
+  "latest": 2025,
+  "service": "https://geo.dot.gov/server/rest/services/Hosted/HPMS_FULL_ND_2025/FeatureServer/0",
+  "rows": 103400,
+  "aadtRows": 57635,
+  "fedAidRows": 103400
+ },
+ {
+  "state": "NE",
+  "years": [
+   2020,
+   2021,
+   2022,
+   2023,
+   2024,
+   2025
+  ],
+  "latest": 2025,
+  "service": "https://geo.dot.gov/server/rest/services/Hosted/HPMS_FULL_NE_2025/FeatureServer/0",
+  "rows": 254313,
+  "aadtRows": 163301,
+  "fedAidRows": 251254
+ },
+ {
+  "state": "NH",
+  "years": [
+   2020,
+   2022,
+   2023,
+   2024,
+   2025
+  ],
+  "latest": 2025,
+  "service": "https://geo.dot.gov/server/rest/services/Hosted/HPMS_FULL_NH_2025/FeatureServer/0",
+  "rows": 83079,
+  "aadtRows": 39988,
+  "fedAidRows": 83079
+ },
+ {
+  "state": "NJ",
+  "years": [
+   2020,
+   2021,
+   2022,
+   2023,
+   2024,
+   2025
+  ],
+  "latest": 2025,
+  "service": "https://geo.dot.gov/server/rest/services/Hosted/HPMS_FULL_NJ_2025/FeatureServer/0",
+  "rows": 159683,
+  "aadtRows": 64529,
+  "fedAidRows": 65793
+ },
+ {
+  "state": "NM",
+  "years": [
+   2020,
+   2022,
+   2023,
+   2024,
+   2025
+  ],
+  "latest": 2025,
+  "service": "https://geo.dot.gov/server/rest/services/Hosted/HPMS_FULL_NM_2025/FeatureServer/0",
+  "rows": 156563,
+  "aadtRows": 59327,
+  "fedAidRows": 156563
+ },
+ {
+  "state": "NV",
+  "years": [
+   2020,
+   2022,
+   2023,
+   2024,
+   2025
+  ],
+  "latest": 2025,
+  "service": "https://geo.dot.gov/server/rest/services/Hosted/HPMS_FULL_NV_2025/FeatureServer/0",
+  "rows": 100243,
+  "aadtRows": 47173,
+  "fedAidRows": 100243
+ },
+ {
+  "state": "NY",
+  "years": [
+   2020,
+   2022,
+   2023,
+   2024,
+   2025
+  ],
+  "latest": 2025,
+  "service": "https://geo.dot.gov/server/rest/services/Hosted/HPMS_FULL_NY_2025/FeatureServer/0",
+  "rows": 730335,
+  "aadtRows": 340337,
+  "fedAidRows": 674688
+ },
+ {
+  "state": "OH",
+  "years": [
+   2020,
+   2022,
+   2023,
+   2024,
+   2025
+  ],
+  "latest": 2025,
+  "service": "https://geo.dot.gov/server/rest/services/Hosted/HPMS_FULL_OH_2025/FeatureServer/0",
+  "rows": 493778,
+  "aadtRows": 172054,
+  "fedAidRows": 493777
+ },
+ {
+  "state": "OK",
+  "years": [
+   2020,
+   2021,
+   2022,
+   2023,
+   2024,
+   2025
+  ],
+  "latest": 2025,
+  "service": "https://geo.dot.gov/server/rest/services/Hosted/HPMS_FULL_OK_2025/FeatureServer/0",
+  "rows": 414557,
+  "aadtRows": 120869,
+  "fedAidRows": 414142
+ },
+ {
+  "state": "OR",
+  "years": [
+   2020,
+   2021,
+   2022,
+   2023,
+   2024,
+   2025
+  ],
+  "latest": 2025,
+  "service": "https://geo.dot.gov/server/rest/services/Hosted/HPMS_FULL_OR_2025/FeatureServer/0",
+  "rows": 570965,
+  "aadtRows": 110643,
+  "fedAidRows": 118662
+ },
+ {
+  "state": "PA",
+  "years": [
+   2020,
+   2022,
+   2023,
+   2024,
+   2025
+  ],
+  "latest": 2025,
+  "service": "https://geo.dot.gov/server/rest/services/Hosted/HPMS_FULL_PA_2025/FeatureServer/0",
+  "rows": 771400,
+  "aadtRows": 771396,
+  "fedAidRows": 771396
+ },
+ {
+  "state": "PR",
+  "years": [
+   2020,
+   2022,
+   2023,
+   2024,
+   2025
+  ],
+  "latest": 2025,
+  "service": "https://geo.dot.gov/server/rest/services/Hosted/HPMS_FULL_PR_2025/FeatureServer/0",
+  "rows": 262462,
+  "aadtRows": 252455,
+  "fedAidRows": 262121
+ },
+ {
+  "state": "RI",
+  "years": [
+   2020,
+   2022,
+   2023,
+   2024,
+   2025
+  ],
+  "latest": 2025,
+  "service": "https://geo.dot.gov/server/rest/services/Hosted/HPMS_FULL_RI_2025/FeatureServer/0",
+  "rows": 56444,
+  "aadtRows": 28234,
+  "fedAidRows": 56293
+ },
+ {
+  "state": "SC",
+  "years": [
+   2020,
+   2022,
+   2023,
+   2024,
+   2025
+  ],
+  "latest": 2025,
+  "service": "https://geo.dot.gov/server/rest/services/Hosted/HPMS_FULL_SC_2025/FeatureServer/0",
+  "rows": 270215,
+  "aadtRows": 267867,
+  "fedAidRows": 270215
+ },
+ {
+  "state": "SD",
+  "years": [
+   2022,
+   2023,
+   2024,
+   2025
+  ],
+  "latest": 2025,
+  "service": "https://geo.dot.gov/server/rest/services/Hosted/HPMS_FULL_SD_2025/FeatureServer/0",
+  "rows": 113998,
+  "aadtRows": 60421,
+  "fedAidRows": 113998
+ },
+ {
+  "state": "TN",
+  "years": [
+   2020,
+   2022,
+   2023,
+   2024,
+   2025
+  ],
+  "latest": 2025,
+  "service": "https://geo.dot.gov/server/rest/services/Hosted/HPMS_FULL_TN_2025/FeatureServer/0",
+  "rows": 263247,
+  "aadtRows": 100090,
+  "fedAidRows": 263247
+ },
+ {
+  "state": "TX",
+  "years": [
+   2021,
+   2022,
+   2023,
+   2024,
+   2025
+  ],
+  "latest": 2025,
+  "service": "https://geo.dot.gov/server/rest/services/Hosted/HPMS_FULL_TX_2025/FeatureServer/0",
+  "rows": 916569,
+  "aadtRows": 389563,
+  "fedAidRows": 913031
+ },
+ {
+  "state": "UT",
+  "years": [
+   2020,
+   2022,
+   2023,
+   2024,
+   2025
+  ],
+  "latest": 2025,
+  "service": "https://geo.dot.gov/server/rest/services/Hosted/HPMS_FULL_UT_2025/FeatureServer/0",
+  "rows": 283867,
+  "aadtRows": 117910,
+  "fedAidRows": 280989
+ },
+ {
+  "state": "VA",
+  "years": [
+   2019,
+   2020,
+   2021,
+   2022,
+   2023,
+   2024,
+   2025
+  ],
+  "latest": 2025,
+  "service": "https://geo.dot.gov/server/rest/services/Hosted/HPMS_FULL_VA_2025/FeatureServer/0",
+  "rows": 568031,
+  "aadtRows": 538604,
+  "fedAidRows": 566311
+ },
+ {
+  "state": "VT",
+  "years": [
+   2020,
+   2022,
+   2023,
+   2024,
+   2025
+  ],
+  "latest": 2025,
+  "service": "https://geo.dot.gov/server/rest/services/Hosted/HPMS_FULL_VT_2025/FeatureServer/0",
+  "rows": 65856,
+  "aadtRows": 44788,
+  "fedAidRows": 65735
+ },
+ {
+  "state": "WA",
+  "years": [
+   2020,
+   2022,
+   2023,
+   2024,
+   2025
+  ],
+  "latest": 2025,
+  "service": "https://geo.dot.gov/server/rest/services/Hosted/HPMS_FULL_WA_2025/FeatureServer/0",
+  "rows": 281851,
+  "aadtRows": 128097,
+  "fedAidRows": 281714
+ },
+ {
+  "state": "WI",
+  "years": [
+   2020,
+   2022,
+   2023,
+   2024,
+   2025
+  ],
+  "latest": 2025,
+  "service": "https://geo.dot.gov/server/rest/services/Hosted/HPMS_FULL_WI_2025/FeatureServer/0",
+  "rows": 873787,
+  "aadtRows": 203909,
+  "fedAidRows": 873787
+ },
+ {
+  "state": "WV",
+  "years": [
+   2020,
+   2022,
+   2023,
+   2024,
+   2025
+  ],
+  "latest": 2025,
+  "service": "https://geo.dot.gov/server/rest/services/Hosted/HPMS_FULL_WV_2025/FeatureServer/0",
+  "rows": 207444,
+  "aadtRows": 175484,
+  "fedAidRows": 207444
+ },
+ {
+  "state": "WY",
+  "years": [
+   2020,
+   2021,
+   2022,
+   2023,
+   2024,
+   2025
+  ],
+  "latest": 2025,
+  "service": "https://geo.dot.gov/server/rest/services/Hosted/HPMS_FULL_WY_2025/FeatureServer/0",
+  "rows": 81994,
+  "aadtRows": 81915,
+  "fedAidRows": 81994
+ }
+]

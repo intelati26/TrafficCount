@@ -5,6 +5,7 @@ import {
   ArchivedItem,
   NaturalCorridorPackage 
 } from '../types/traffic';
+import { recordTombstone } from './tombstones';
 import { 
   INITIAL_MULTI_STATE_DOCUMENTS, 
   INITIAL_MULTI_STATE_SEGMENTS, 
@@ -218,8 +219,11 @@ class TrafficDatabase {
   // Put / Upsert
   public async put<T extends { id: string }>(
     storeName: 'documents' | 'segments' | 'stations' | 'archives' | 'custom_counts', 
-    item: T
+    item: T,
+    opts: { keepStamp?: boolean } = {}
   ): Promise<void> {
+    // user-owned stores carry updatedAt so notes/settings can be merged between devices (see userState.ts)
+    if ((storeName === 'archives' || storeName === 'custom_counts') && !opts.keepStamp) item = { ...item, updatedAt: new Date().toISOString() };
     const db = await this.initDatabase();
     if (!db) {
       const list = this.memoryFallback[storeName] as any[];
@@ -250,8 +254,10 @@ class TrafficDatabase {
   // Delete
   public async delete(
     storeName: 'documents' | 'segments' | 'stations' | 'archives' | 'custom_counts', 
-    id: string
+    id: string,
+    opts: { silent?: boolean } = {}
   ): Promise<void> {
+    if (!opts.silent) recordTombstone(storeName, id); // remember the deletion so a merge from another device does not resurrect it
     const db = await this.initDatabase();
     if (!db) {
       const list = this.memoryFallback[storeName] as any[];
