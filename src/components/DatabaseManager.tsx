@@ -92,7 +92,7 @@ export const DatabaseManager: React.FC<DatabaseManagerProps> = ({ onDatabaseChan
   const handleExportState = async () => {
     const { json, counts } = await exportUserState();
     downloadFile(json, `traffic-archive-notes-settings_${new Date().toISOString().slice(0, 10)}.json`, 'application/json');
-    setStatusMessage({ text: `Notes & settings exported: ${counts.archives} archives, ${counts.custom_counts} custom counts, ${counts.settings} settings, ${counts.deletions} deletions.`, type: 'success' });
+    setStatusMessage({ text: `Notes & settings exported: ${counts.archives} archives, ${counts.custom_counts} custom counts, ${counts.settings} settings, ${counts.traveled} travelled segments, ${counts.deletions} deletions.`, type: 'success' });
   };
   const handleStateFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];

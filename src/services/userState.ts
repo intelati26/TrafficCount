@@ -1,3 +1,4 @@
+import { travelled, TravelMark } from './traveled';
 // "Notes & settings" sync file: a small, mergeable JSON of YOUR data only (saved archives, notes, custom counts, settings, deletions).
 // It never contains the built traffic data (Parquet) or the bundled sample tables. Merge is last-write-wins per record using updatedAt,
 // and deletions travel as tombstones, so files can be passed between devices in any order without losing newer edits.
@@ -10,15 +11,15 @@ const stamp = (r: Rec) => r.updatedAt ?? r.dateArchived ?? r.createdAt ?? '';
 
 export interface UserStateFile {
   app: 'traffic-archive'; kind: 'user-state'; version: number; deviceId: string; exportedAt: string;
-  records: Record<SyncedStore, Rec[]>; settings: Record<string, Setting>; tombstones: Record<string, string>;
+  records: Record<SyncedStore, Rec[]>; traveled?: TravelMark[]; settings: Record<string, Setting>; tombstones: Record<string, string>;
 }
 export interface MergeSummary { added: number; updated: number; deleted: number; unchanged: number; settings: number; skipped: number }
 
 export async function exportUserState(): Promise<{ json: string; counts: Record<string, number> }> {
   const records = {} as Record<SyncedStore, Rec[]>;
   for (const s of SYNCED_STORES) records[s] = await trafficDb.getAll<Rec>(s);
-  const file: UserStateFile = { app: 'traffic-archive', kind: 'user-state', version: USER_STATE_VERSION, deviceId: getDeviceId(), exportedAt: new Date().toISOString(), records, settings: getSettings(), tombstones: getTombstones() };
-  return { json: JSON.stringify(file), counts: { archives: records.archives.length, custom_counts: records.custom_counts.length, settings: Object.keys(file.settings).length, deletions: Object.keys(file.tombstones).length } };
+  const file: UserStateFile = { app: 'traffic-archive', kind: 'user-state', version: USER_STATE_VERSION, deviceId: getDeviceId(), exportedAt: new Date().toISOString(), records, traveled: travelled.raw(), settings: getSettings(), tombstones: getTombstones() };
+  return { json: JSON.stringify(file), counts: { archives: records.archives.length, custom_counts: records.custom_counts.length, settings: Object.keys(file.settings).length, traveled: travelled.all().length, deletions: Object.keys(file.tombstones).length } };
 }
 
 /** Merge an incoming file. With dryRun true nothing is written: returns what would change. */
@@ -50,6 +51,7 @@ export async function mergeUserState(text: string, dryRun = false): Promise<{ ok
       if (!dryRun && (!tombs[key] || tombs[key] < at)) tombs[key] = at;
     }
   }
+  const tv = travelled.merge(f.traveled ?? [], dryRun); sum.updated += tv;
   const st = getSettings();
   for (const [k, s] of Object.entries(f.settings ?? {})) if (!st[k] || st[k].updatedAt < s.updatedAt) { sum.settings++; st[k] = s; }
   if (!dryRun) { setSettings(st); setTombstones(tombs); }

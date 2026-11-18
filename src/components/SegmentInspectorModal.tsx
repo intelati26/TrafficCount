@@ -1,3 +1,5 @@
+import { travelled, useTravelVersion } from '../services/traveled';
+import { laneUtilization } from '../utils/laneUtilization';
 import React, { useEffect, useMemo, useState } from 'react';
 import { 
   X, 
@@ -39,6 +41,7 @@ export const SegmentInspectorModal: React.FC<SegmentInspectorModalProps> = ({
   onClose,
   onRefresh
 }) => {
+  const tv = useTravelVersion();
   // per-year statistics (history) and, on desktop only, every other source attribute; both load on demand by segment id
   const [hist, setHist] = useState<Record<string, any>[]>([]);
   const [attrs, setAttrs] = useState<Record<string, any> | null>(null);
@@ -115,12 +118,19 @@ export const SegmentInspectorModal: React.FC<SegmentInspectorModalProps> = ({
             </div>
           </div>
 
+          <div className="flex items-center gap-2">
+          {(() => { void tv; const on = travelled.has(segment); return (
+            <button onClick={() => (on ? travelled.unmark([segment]) : travelled.mark([segment]))} title="Marks this road in both directions"
+              className={`px-2.5 py-1 rounded text-[11px] font-medium border ${on ? 'bg-fuchsia-900/60 border-fuchsia-700 text-fuchsia-200' : 'bg-slate-800 border-slate-700 text-slate-200 hover:bg-slate-700'}`}>
+              {on ? '✓ Travelled (both directions)' : 'Mark travelled'}
+            </button>); })()}
           <button
             onClick={onClose}
             className="p-1 text-slate-400 hover:text-slate-100 rounded hover:bg-slate-800"
           >
             <X className="w-5 h-5" />
           </button>
+          </div>
         </div>
 
         {/* Scrollable Content */}
@@ -149,6 +159,17 @@ export const SegmentInspectorModal: React.FC<SegmentInspectorModalProps> = ({
                 {segment.peakHourVolume ? segment.peakHourVolume.toLocaleString() : '—'}
               </span>
               <span className="text-[10px] text-slate-500">{segment.kFactor ? `K-factor: ${Math.round(segment.kFactor * 100)}%` : 'not in this source'}</span>
+            </div>
+
+            <div className="bg-slate-950 border border-slate-800 rounded-lg p-3">
+              <span className="text-slate-400 text-[10px] block">Peak vph / lane</span>
+              {(() => { const u = laneUtilization(segment); return u ? (<>
+                <span className={`text-lg font-bold font-mono mt-0.5 block ${u.utilization >= 1 ? 'text-red-400' : u.utilization >= 0.7 ? 'text-amber-400' : 'text-sky-400'}`}>{u.approximate ? '~' : ''}{u.vphPerLane.toLocaleString()}</span>
+                <span className="text-[10px] text-slate-500">{Math.round(u.utilization * 100)}% of 2,000 · {u.lanesPerDirection} lane{u.lanesPerDirection === 1 ? '' : 's'}/dir{u.approximate ? ' · approx.' : ''}</span>
+              </>) : (<>
+                <span className="text-lg font-bold font-mono text-slate-600 mt-0.5 block">—</span>
+                <span className="text-[10px] text-slate-500">needs K-factor, AADT and lanes</span>
+              </>); })()}
             </div>
 
             <div className="bg-slate-950 border border-slate-800 rounded-lg p-3">

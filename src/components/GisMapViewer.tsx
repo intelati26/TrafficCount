@@ -1,3 +1,5 @@
+import { travelled, useTravelVersion } from '../services/traveled';
+import { laneUtilization } from '../utils/laneUtilization';
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { 
   ZoomIn, 
@@ -57,6 +59,7 @@ export const GisMapViewer: React.FC<GisMapViewerProps> = ({
   const svgRef = useRef<SVGSVGElement>(null);
   const panRef = useRef({ x: 0, y: 0 });
   const zoomRef = useRef(1);
+  const wheelTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dragRef = useRef<{ sx: number; sy: number } | null>(null);
   const pinchRef = useRef<{ d: number; z: number } | null>(null);
   const [dragStart, setDragStart] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
@@ -75,6 +78,10 @@ export const GisMapViewer: React.FC<GisMapViewerProps> = ({
   const [showShields, setShowShields] = useState<boolean>(true);
   // by default the map draws the current network; older-era segments overlap it, so they are an opt-in layer
   const [showHistorical, setShowHistorical] = useState<boolean>(false);
+  // colour segments by traffic volume, or by peak-hour lane utilization (peak vph per lane vs ~2,000 capacity)
+  const tv = useTravelVersion();
+  const [showTravelled, setShowTravelled] = useState<boolean>(true);
+  const [colorMode, setColorMode] = useState<'aadt' | 'util'>('aadt');
   const [multiSelectMode, setMultiSelectMode] = useState<boolean>(false);
   // the legend covers a third of a phone screen: start collapsed on narrow screens
   const [isLegendExpanded, setIsLegendExpanded] = useState<boolean>(() => typeof window === 'undefined' || window.innerWidth >= 768);
@@ -303,10 +310,12 @@ export const GisMapViewer: React.FC<GisMapViewerProps> = ({
       e.preventDefault();
       zoomRef.current = Math.min(Math.max(zoomRef.current * (e.deltaY < 0 ? 1.15 : 0.87), 0.7), 4.5);
       applyTransform();
-      setZoom(zoomRef.current);
+      // commit to React once the wheel stops: re-rendering the whole map on every tick is what made zooming stutter
+      if (wheelTimer.current) clearTimeout(wheelTimer.current);
+      wheelTimer.current = setTimeout(() => { setZoom(zoomRef.current); setPan({ ...panRef.current }); }, 140);
     };
     el.addEventListener('wheel', onWheel, { passive: false });
-    return () => el.removeEventListener('wheel', onWheel);
+    return () => { el.removeEventListener('wheel', onWheel); if (wheelTimer.current) clearTimeout(wheelTimer.current); };
   }, []);
 
   const resetView = () => {
@@ -320,6 +329,12 @@ export const GisMapViewer: React.FC<GisMapViewerProps> = ({
   };
 
   // Simplified Traffic Color Scheme (Clean DOT cartographic palette)
+  const getUtilColor = (seg: TrafficSegment) => {
+    const u = laneUtilization(seg)?.utilization;
+    if (u == null) return '#475569';
+    return u >= 1 ? '#dc2626' : u >= 0.8 ? '#ea580c' : u >= 0.6 ? '#d97706' : u >= 0.4 ? '#10b981' : '#3b82f6';
+  };
+
   const getTrafficColor = (aadt: number) => {
     if (mapStyle === 'clean') return '#60a5fa'; // Minimalist uniform corridor
     if (aadt >= 120000) return '#dc2626'; // High Volume (Red)
@@ -346,10 +361,12 @@ export const GisMapViewer: React.FC<GisMapViewerProps> = ({
   // Route shields only appear zoomed in (a shield on every Interstate segment made the whole state unreadable and unpannable).
   const shieldsOn = showShields && zoom >= 2.2;
   const dense = filteredSegments.length > 4000;
-  const zoomBucket = Math.max(0.5, Math.round(zoom * 2) / 2);
+  // the 40k-element layer is only rebuilt when something it draws changes: shields (zoomed in) and the invisible click targets
+  const zoomBucket = shieldsOn ? Math.max(0.5, Math.round(zoom * 2) / 2) : 0;
+  const hitOn = !dense || zoom >= 2.5;
   const segmentLayer = useMemo(() => {
   // one shield per route per screen cell, so a long highway shows a few badges instead of one per segment
-  const taken = new Set<string>(); const cell = 130 / zoomBucket;
+  const taken = new Set<string>(); const cell = 130 / (zoomBucket || 1);
   const takeShield = (route: string, x: number, y: number) => { const k = `${route}|${Math.floor(x / cell)}|${Math.floor(y / cell)}`; if (taken.has(k)) return false; taken.add(k); return true; };
   return (
   <g className="traffic-segments">
@@ -362,7 +379,7 @@ export const GisMapViewer: React.FC<GisMapViewerProps> = ({
         })
         .join(' ');
 
-      const strokeColor = isSelected ? '#38bdf8' : getTrafficColor(seg.aadtCurrent);
+      const strokeColor = isSelected ? '#38bdf8' : showTravelled && travelled.has(seg) ? '#d946ef' : colorMode === 'util' ? getUtilColor(seg) : getTrafficColor(seg.aadtCurrent);
       const strokeWidth = isSelected 
         ? getTrafficStrokeWidth(seg.aadtCurrent) + 2.8 
         : getTrafficStrokeWidth(seg.aadtCurrent);
@@ -373,7 +390,7 @@ export const GisMapViewer: React.FC<GisMapViewerProps> = ({
       return (
         <g 
           key={seg.id}
-          className="cursor-pointer transition-opacity"
+          className="cursor-pointer"
           onClick={(e) => {
             e.stopPropagation();
             const isMulti = e.shiftKey || multiSelectMode;
@@ -392,15 +409,15 @@ export const GisMapViewer: React.FC<GisMapViewerProps> = ({
           }}
           onMouseLeave={() => setHoveredItem(null)}
         >
-          {/* Invisible wide hit target for effortless clicks */}
-          <path
+          {/* Invisible wide hit target for effortless clicks (skipped on very dense maps until zoomed in: it doubles the element count) */}
+          {hitOn && <path
             d={pathString}
             fill="none"
             stroke="transparent"
             strokeWidth={Math.max(strokeWidth + 14, 18)}
             strokeLinecap="round"
             strokeLinejoin="round"
-          />
+          />}
 
           {/* Halo when selected */}
           {isSelected && (
@@ -472,7 +489,7 @@ export const GisMapViewer: React.FC<GisMapViewerProps> = ({
   </g>
   );
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filteredSegments, selectedIds, mapStyle, shieldsOn, zoomBucket, dense, multiSelectMode, onSelectSegment, stateConfig]);
+  }, [filteredSegments, selectedIds, mapStyle, shieldsOn, zoomBucket, hitOn, dense, multiSelectMode, onSelectSegment, stateConfig, colorMode, showTravelled, tv]);
 
   return (
     <div className="flex flex-col h-full bg-[#070b14] text-slate-100 overflow-hidden select-none font-sans">
@@ -670,6 +687,19 @@ export const GisMapViewer: React.FC<GisMapViewerProps> = ({
                     className="rounded bg-slate-800 border-slate-700 text-sky-500 focus:ring-0"
                   />
                 </label>
+                <label className="flex items-center justify-between px-2 py-1 rounded hover:bg-slate-800 cursor-pointer" title="Draw segments you marked as travelled in magenta (both directions)">
+                  <span className="text-slate-300">Show travelled (magenta)</span>
+                  <input type="checkbox" checked={showTravelled} onChange={(e) => setShowTravelled(e.target.checked)} className="rounded bg-slate-800 border-slate-700 text-sky-500 focus:ring-0" />
+                </label>
+                <label className="flex items-center justify-between px-2 py-1 rounded hover:bg-slate-800 cursor-pointer" title="Colour segments by peak-hour vehicles per lane in the busier direction (AADT x K x D / lanes per direction) instead of by AADT">
+                  <span className="text-slate-300">Colour by lane utilization</span>
+                  <input
+                    type="checkbox"
+                    checked={colorMode === 'util'}
+                    onChange={(e) => setColorMode(e.target.checked ? 'util' : 'aadt')}
+                    className="rounded bg-slate-800 border-slate-700 text-sky-500 focus:ring-0"
+                  />
+                </label>
                 <label className="flex items-center justify-between px-2 py-1 rounded hover:bg-slate-800 cursor-pointer" title="Also draw segments whose newest count is from an earlier year (older road segmentation; overlaps the current network)">
                   <span className="text-slate-300">Counted only in earlier years</span>
                   <input
@@ -714,7 +744,7 @@ export const GisMapViewer: React.FC<GisMapViewerProps> = ({
           style={{
             transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
             transformOrigin: 'center center',
-            transition: isDragging ? 'none' : 'transform 0.1s ease-out',
+            transition: 'none', // direct transforms while zooming; a CSS transition restarted on every wheel tick
             willChange: 'transform'
           }}
         >
@@ -980,6 +1010,16 @@ export const GisMapViewer: React.FC<GisMapViewerProps> = ({
 
             {isLegendExpanded && (
               <div className="p-3 space-y-2 border-t border-slate-800/80">
+                {colorMode === 'util' ? (
+                  <div className="space-y-1.5 text-[11px]">
+                    {[['bg-red-600', '≥ 2,000 vph/lane', 'At capacity'], ['bg-orange-600', '1,600 – 2,000', 'Heavy'], ['bg-amber-600', '1,200 – 1,600', 'Busy'], ['bg-emerald-500', '800 – 1,200', 'Moderate'], ['bg-blue-500', '< 800', 'Light'], ['bg-slate-600', 'no K-factor / lanes', 'Not computable']].map(([c, a, b]) => (
+                      <div key={a} className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-2"><span className={`w-4 h-1.5 rounded-xs ${c}`}></span><span className="text-slate-300">{a}</span></div>
+                        <span className="text-slate-500 text-[10px]">{b}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
                 <div className="space-y-1.5 text-[11px]">
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex items-center gap-2">
@@ -1017,6 +1057,7 @@ export const GisMapViewer: React.FC<GisMapViewerProps> = ({
                     <span className="text-slate-500 text-[10px]">Local Highway</span>
                   </div>
                 </div>
+                )}
 
                 <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-[10px] text-slate-400">
                   <div className="flex items-center gap-1.5">

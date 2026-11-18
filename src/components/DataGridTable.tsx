@@ -1,3 +1,4 @@
+import { laneUtilization } from '../utils/laneUtilization';
 import React, { useState, useMemo, useEffect } from 'react';
 import { 
   Table, 
@@ -33,7 +34,7 @@ interface DataGridTableProps {
   stateLabel?: string;
 }
 
-type SortField = 'route' | 'county' | 'districtId' | 'aadtCurrent' | 'aadt2023' | 'commercialAadt' | 'commercialPercent' | 'peakHourVolume' | 'lanes' | 'speedLimit';
+type SortField = 'route' | 'county' | 'districtId' | 'aadtCurrent' | 'aadt2023' | 'commercialAadt' | 'commercialPercent' | 'peakHourVolume' | 'lanes' | 'speedLimit' | 'vphPerLane';
 
 export const DataGridTable: React.FC<DataGridTableProps> = ({
   segments,
@@ -46,6 +47,7 @@ export const DataGridTable: React.FC<DataGridTableProps> = ({
   const [selectedDistrict, setSelectedDistrict] = useState<string>('all');
   const [minAadt, setMinAadt] = useState<number>(0);
   const [minTruckPercent, setMinTruckPercent] = useState<number>(0);
+  const [minVph, setMinVph] = useState<number>(0);
 
   // Only the first N rows are put in the DOM (states can hold tens of thousands of segments)
   const [visibleCount, setVisibleCount] = useState<number>(250);
@@ -76,7 +78,7 @@ export const DataGridTable: React.FC<DataGridTableProps> = ({
   const [districtList, setDistrictList] = useState<{ id: string; n: number }[] | null>(null);
   const [debounced, setDebounced] = useState<string>('');
   useEffect(() => { const t = setTimeout(() => setDebounced(searchQuery), 250); return () => clearTimeout(t); }, [searchQuery]);
-  useEffect(() => { setPage(0); }, [stateCode, debounced, selectedDistrict, minAadt, minTruckPercent, sortField, sortDirection]);
+  useEffect(() => { setPage(0); }, [stateCode, debounced, selectedDistrict, minAadt, minTruckPercent, minVph, sortField, sortDirection]);
   useEffect(() => {
     let alive = true; setDistrictList(null);
     if (stateCode) queryDb.has(stateCode, 'seg').then((h) => h ? queryDb.districts(stateCode) : null).then((d) => { if (alive) setDistrictList(d); }).catch(() => {});
@@ -88,11 +90,11 @@ export const DataGridTable: React.FC<DataGridTableProps> = ({
     setSqlBusy(true);
     queryDb.has(stateCode, 'seg').then(async (has) => {
       if (!has) { if (alive) setSql(null); return; }
-      const r = await queryDb.grid(stateCode, { search: debounced, district: selectedDistrict, minAadt, minTruckPct: minTruckPercent, sort: sortField, dir: sortDirection, limit: PAGE_SIZE, offset: page * PAGE_SIZE, recentOnly: false });
+      const r = await queryDb.grid(stateCode, { search: debounced, district: selectedDistrict, minAadt, minTruckPct: minTruckPercent, minVphPerLane: minVph, sort: sortField, dir: sortDirection, limit: PAGE_SIZE, offset: page * PAGE_SIZE, recentOnly: false });
       if (alive) setSql(r);
     }).catch((e) => console.warn('Grid query failed:', e)).finally(() => { if (alive) setSqlBusy(false); });
     return () => { alive = false; };
-  }, [stateCode, debounced, selectedDistrict, minAadt, minTruckPercent, sortField, sortDirection, page]);
+  }, [stateCode, debounced, selectedDistrict, minAadt, minTruckPercent, minVph, sortField, sortDirection, page]);
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -111,6 +113,7 @@ export const DataGridTable: React.FC<DataGridTableProps> = ({
         if (selectedDistrict !== 'all' && seg.districtId !== selectedDistrict) return false;
         if (seg.aadtCurrent < minAadt) return false;
         if (seg.commercialPercent < minTruckPercent) return false;
+        if (minVph > 0 && (laneUtilization(seg)?.vphPerLane ?? 0) < minVph) return false;
         if (searchQuery.trim()) {
           const q = searchQuery.toLowerCase();
           const matchRoute = seg.route.toLowerCase().includes(q);
@@ -122,17 +125,18 @@ export const DataGridTable: React.FC<DataGridTableProps> = ({
         return true;
       })
       .sort((a, b) => {
-        let valA: any = a[sortField];
-        let valB: any = b[sortField];
+        const get = (x: TrafficSegment): any => sortField === 'vphPerLane' ? (laneUtilization(x)?.vphPerLane ?? -1) : x[sortField];
+        let valA: any = get(a);
+        let valB: any = get(b);
 
         if (typeof valA === 'string') {
           return sortDirection === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
         }
         return sortDirection === 'asc' ? valA - valB : valB - valA;
       });
-  }, [sql, segments, selectedDistrict, minAadt, minTruckPercent, searchQuery, sortField, sortDirection]);
+  }, [sql, segments, selectedDistrict, minAadt, minTruckPercent, minVph, searchQuery, sortField, sortDirection]);
 
-  useEffect(() => { setVisibleCount(250); }, [selectedDistrict, minAadt, minTruckPercent, searchQuery, sortField, sortDirection]);
+  useEffect(() => { setVisibleCount(250); }, [selectedDistrict, minAadt, minTruckPercent, minVph, searchQuery, sortField, sortDirection]);
 
   // Handle Save Custom Count
   const handleSaveCustomCount = async (e: React.FormEvent) => {
@@ -160,14 +164,14 @@ export const DataGridTable: React.FC<DataGridTableProps> = ({
 
   const handleExportCSV = async () => {
     // whole-state mode exports every match (up to 100,000 rows), not just the visible page
-    const all = sql && stateCode ? (await queryDb.grid(stateCode, { search: debounced, district: selectedDistrict, minAadt, minTruckPct: minTruckPercent, sort: sortField, dir: sortDirection, limit: 100000 })).rows : processedSegments;
+    const all = sql && stateCode ? (await queryDb.grid(stateCode, { search: debounced, district: selectedDistrict, minAadt, minTruckPct: minTruckPercent, minVphPerLane: minVph, sort: sortField, dir: sortDirection, limit: 100000 })).rows : processedSegments;
     const csv = exportSegmentsToCSV(all);
     downloadFile(csv, `Traffic_Segments_${new Date().toISOString().split('T')[0]}.csv`, 'text/csv');
   };
 
   const handleExportGeoJSON = async () => {
     // geometry is only loaded for the export, capped at 20,000 features
-    const all = sql && stateCode ? (await queryDb.grid(stateCode, { search: debounced, district: selectedDistrict, minAadt, minTruckPct: minTruckPercent, sort: sortField, dir: sortDirection, limit: 20000, withGeometry: true })).rows : processedSegments;
+    const all = sql && stateCode ? (await queryDb.grid(stateCode, { search: debounced, district: selectedDistrict, minAadt, minTruckPct: minTruckPercent, minVphPerLane: minVph, sort: sortField, dir: sortDirection, limit: 20000, withGeometry: true })).rows : processedSegments;
     const geojson = exportSegmentsToGeoJSON(all);
     downloadFile(geojson, `Traffic_Segments_${new Date().toISOString().split('T')[0]}.geojson`, 'application/json');
   };
@@ -282,6 +286,12 @@ export const DataGridTable: React.FC<DataGridTableProps> = ({
               &gt;{minTruckPercent}%
             </span>
           </div>
+          {/* Min peak vph/lane slider */}
+          <div className="flex items-center gap-2 bg-slate-950 px-2.5 py-1 rounded border border-slate-800" title="Peak-hour volume per lane in the busier direction: AADT x K x D / lanes per direction">
+            <span className="text-slate-400 text-[11px] flex-shrink-0">Peak vph/lane:</span>
+            <input type="range" min="0" max="2400" step="100" value={minVph} onChange={(e) => setMinVph(Number(e.target.value))} className="w-full accent-sky-500" />
+            <span className="font-mono text-sky-400 text-[11px] w-12 text-right">&gt;{minVph}</span>
+          </div>
         </div>
       </div>
 
@@ -327,6 +337,12 @@ export const DataGridTable: React.FC<DataGridTableProps> = ({
                   {sortField === 'commercialAadt' ? (sortDirection === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />) : <ArrowUpDown className="w-3 h-3 opacity-40" />}
                 </div>
               </th>
+              <th className="py-2.5 px-3 text-right cursor-pointer hover:text-slate-200" onClick={() => handleSort('vphPerLane')} title="Peak-direction vehicles per hour per lane (2,000 = about capacity)">
+                <div className="flex items-center justify-end gap-1">
+                  <span>Peak vph/lane</span>
+                  {sortField === 'vphPerLane' ? (sortDirection === 'asc' ? <ArrowUp className="w-3 h-3 text-sky-400" /> : <ArrowDown className="w-3 h-3 text-sky-400" />) : <ArrowUpDown className="w-3 h-3 opacity-40" />}
+                </div>
+              </th>
               <th className="py-2.5 px-3 text-center">Lanes / Speed</th>
               <th className="py-2.5 px-3">Functional Class</th>
               <th className="py-2.5 px-3 text-right">Actions</th>
@@ -363,6 +379,9 @@ export const DataGridTable: React.FC<DataGridTableProps> = ({
                 </td>
                 <td className="py-2.5 px-3 text-right font-mono text-slate-300 whitespace-nowrap">
                   {seg.commercialAadt.toLocaleString()}
+                </td>
+                <td className="py-2.5 px-3 text-right font-mono whitespace-nowrap">
+                  {(() => { const u = laneUtilization(seg); return u ? <span className={u.utilization >= 1 ? 'text-red-400 font-bold' : u.utilization >= 0.7 ? 'text-amber-400' : 'text-sky-400'} title={u.approximate ? 'Approximate: assumed directional split or odd lane count' : undefined}>{u.approximate ? '~' : ''}{u.vphPerLane.toLocaleString()}</span> : <span className="text-slate-600">—</span>; })()}
                 </td>
                 <td className="py-2.5 px-3 text-center text-slate-400 font-mono whitespace-nowrap">
                   {seg.lanes}L · {seg.speedLimit}mph

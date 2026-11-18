@@ -1,5 +1,6 @@
 // DuckDB-WASM query layer over user-built Parquet files in /data/q/ (see docs/STORAGE_DESIGN.md).
 // The repo ships no data: if the manifest is missing, available() resolves false and callers keep the bundled sample data.
+import { laneUtilizationSql } from '../utils/laneUtilization';
 import type * as DuckDB from '@duckdb/duckdb-wasm';
 import type { TrafficSegment, ContinuousCountStation, MoDOTMapDocument } from '../types/traffic';
 import { readLocalManifest, getLocalFile } from './localData';
@@ -218,7 +219,7 @@ export const queryDb = {
    * Table query over a state's whole data set: search, filter, sort and page in SQL (the map only ever holds what is on screen).
    * Returns the page of rows (no geometry unless asked) and the total number of matches.
    */
-  async grid(state: string, o: { search?: string; district?: string; minAadt?: number; minTruckPct?: number; sort?: string; dir?: 'asc' | 'desc'; limit?: number; offset?: number; recentOnly?: boolean; withGeometry?: boolean } = {}): Promise<{ rows: TrafficSegment[]; total: number }> {
+  async grid(state: string, o: { search?: string; district?: string; minAadt?: number; minTruckPct?: number; minVphPerLane?: number; sort?: string; dir?: 'asc' | 'desc'; limit?: number; offset?: number; recentOnly?: boolean; withGeometry?: boolean } = {}): Promise<{ rows: TrafficSegment[]; total: number }> {
     const src = await view(state, 'seg');
     if (!src) return { rows: [], total: 0 };
     const cols = new Set((await query(`SELECT column_name FROM (DESCRIBE SELECT * FROM ${src})`)).map(r => r.column_name as string));
@@ -229,8 +230,10 @@ export const queryDb = {
     if (o.district && o.district !== 'all') conds.push(`district_id = '${o.district.replace(/'/g, "''")}'`);
     if (o.minAadt) conds.push(`aadt_cur >= ${+o.minAadt}`);
     if (o.minTruckPct) conds.push(`commercial_pct >= ${+o.minTruckPct}`);
+    const luSql = laneUtilizationSql(cols);
+    if (o.minVphPerLane && luSql) conds.push(`${luSql} >= ${+o.minVphPerLane}`);
     const where = 'WHERE ' + conds.join(' AND ');
-    const sortMap: Record<string, string> = { route: 'route', county: 'county', districtId: 'district_id', aadtCurrent: 'aadt_cur', aadt2023: cols.has('aadt_2023') ? 'aadt_2023' : 'aadt_cur', commercialAadt: 'commercial_aadt', commercialPercent: 'commercial_pct', peakHourVolume: 'peak_hour_volume', lanes: 'lanes', speedLimit: 'speed_limit' };
+    const sortMap: Record<string, string> = { route: 'route', county: 'county', districtId: 'district_id', aadtCurrent: 'aadt_cur', aadt2023: cols.has('aadt_2023') ? 'aadt_2023' : 'aadt_cur', commercialAadt: 'commercial_aadt', commercialPercent: 'commercial_pct', peakHourVolume: 'peak_hour_volume', lanes: 'lanes', speedLimit: 'speed_limit', ...(luSql ? { vphPerLane: luSql } : {}) };
     const sort = sortMap[o.sort ?? 'aadtCurrent'] ?? 'aadt_cur';
     const select = o.withGeometry ? '*' : '* EXCLUDE (geom, geom_lo)';
     const [{ n }] = await query(`SELECT count(*)::INT n FROM ${src} ${where}`);

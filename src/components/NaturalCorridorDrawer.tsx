@@ -1,3 +1,4 @@
+import { travelled, useTravelVersion } from '../services/traveled';
 import React, { useState } from 'react';
 import { 
   GitCommit, 
@@ -46,6 +47,7 @@ export const NaturalCorridorDrawer: React.FC<NaturalCorridorDrawerProps> = ({
   onInspect
 }) => {
   const [isSavedLocally, setIsSavedLocally] = useState<boolean>(false);
+  useTravelVersion();
 
   if (selectedSegments.length === 0) return null;
 
@@ -130,6 +132,14 @@ export const NaturalCorridorDrawer: React.FC<NaturalCorridorDrawerProps> = ({
 
         {/* Quick Expansion Tools & Close */}
         <div className="flex items-center gap-2">
+          <button
+            onClick={() => (selectedSegments.every((s) => travelled.has(s)) ? travelled.unmark(selectedSegments) : travelled.mark(selectedSegments))}
+            className="px-2.5 py-1 bg-fuchsia-900/60 hover:bg-fuchsia-800 border border-fuchsia-800 rounded text-fuchsia-100 transition text-[11px] font-medium"
+            title="Mark these segments as travelled, both directions"
+          >
+            {selectedSegments.every((s) => travelled.has(s)) ? 'Unmark travelled' : 'Mark all travelled'}
+          </button>
+
           <button
             onClick={handleExpandSurrounding}
             className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded text-slate-200 transition text-[11px] font-medium"

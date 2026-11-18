@@ -1,3 +1,4 @@
+import { TravelTracker } from './components/TravelTracker';
 import { queryDb } from './services/queryDb';
 import { STATE_META } from './data/stateMeta';
 import type { MapViewport } from './components/GisMapViewer';
@@ -263,6 +264,8 @@ export default function App() {
         )}
 
         {activeView === 'data_packs' && <DataPacks />}
+
+        {activeView === 'travel' && <TravelTracker />}
 
         {activeView === 'db_manager' && (
           <DatabaseManager
